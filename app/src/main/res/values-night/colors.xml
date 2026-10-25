@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand_launch">#000000</color>
+    <color name="bsl_accent">#d9a98c</color>
+    <color name="bsl_appbar">#000000</color>
+    <color name="bsl_bg">#000000</color>
+    <color name="bsl_border">#222222</color>
+    <color name="bsl_container">#0d0d0d</color>
+    <color name="bsl_on_accent">#ffffff</color>
+    <color name="bsl_on_appbar">#ffffff</color>
+    <color name="bsl_on_container">#f2d6c2</color>
+    <color name="bsl_surface">#000000</color>
+    <color name="bsl_surface_raised">#0f0f0f</color>
+    <color name="bsl_text">#ede9e4</color>
+    <color name="bsl_text_dim">#a9a29a</color>
+</resources>

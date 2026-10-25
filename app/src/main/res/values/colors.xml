@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand_icon_ink">#faf8f5</color>
+    <color name="brand_launch">#f6f4f1</color>
+    <color name="brand_launcher_from">#b4714c</color>
+    <color name="brand_launcher_to">#9a6480</color>
+    <color name="bsl_accent">#a6623f</color>
+    <color name="bsl_appbar">#a6623f</color>
+    <color name="bsl_bg">#f6f4f1</color>
+    <color name="bsl_border">#e3dfd9</color>
+    <color name="bsl_container">#f2e3da</color>
+    <color name="bsl_on_accent">#ffffff</color>
+    <color name="bsl_on_appbar">#ffffff</color>
+    <color name="bsl_on_container">#5a331a</color>
+    <color name="bsl_surface">#fbfaf8</color>
+    <color name="bsl_surface_raised">#ffffff</color>
+    <color name="bsl_text">#262320</color>
+    <color name="bsl_text_dim">#6e6862</color>
+</resources>
