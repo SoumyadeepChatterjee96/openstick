@@ -375,6 +375,7 @@ fun DesktopScreen(
                             MiniFloatingWindow(
                                 windowState = win,
                                 env = env,
+                                x11Server = x11Server,
                                 runner = runner,
                                 canvasWidthDp = canvasWidth.value,
                                 canvasHeightDp = canvasHeight.value,
@@ -515,6 +516,14 @@ fun DesktopScreen(
                     AndroidView(
                         factory = { context ->
                             LorieView(context).apply {
+                                try {
+                                    val fd = x11Server.openRenderFd()
+                                    if (fd >= 0) {
+                                        connectAsync(fd)
+                                    }
+                                } catch (e: Throwable) {
+                                    android.util.Log.e("DesktopScreen", "Failed to connect LorieView to X11", e)
+                                }
                                 setOnTouchListener { _, event ->
                                     sendTouchEvent(
                                         event.actionMasked,
@@ -590,6 +599,7 @@ private fun ActionChip(
 private fun MiniFloatingWindow(
     windowState: MiniWindowState,
     env: LinuxEnvironment,
+    x11Server: X11Server,
     runner: ProotRunner,
     canvasWidthDp: Float,
     canvasHeightDp: Float,
@@ -699,7 +709,7 @@ private fun MiniFloatingWindow(
                     MiniWindowType.MONITOR -> MiniMonitorView()
                     MiniWindowType.UPDATER -> MiniUpdaterView(env)
                     MiniWindowType.CAMERA -> MiniCameraView()
-                    MiniWindowType.X11 -> MiniX11View()
+                    MiniWindowType.X11 -> MiniX11View(x11Server)
                 }
             }
         }
@@ -987,10 +997,18 @@ private fun MiniCameraView() {
 }
 
 @Composable
-private fun MiniX11View() {
+private fun MiniX11View(x11Server: X11Server) {
     AndroidView(
         factory = { context ->
             LorieView(context).apply {
+                try {
+                    val fd = x11Server.openRenderFd()
+                    if (fd >= 0) {
+                        connectAsync(fd)
+                    }
+                } catch (e: Throwable) {
+                    android.util.Log.e("DesktopScreen", "Failed to connect MiniX11View to X11", e)
+                }
                 setOnTouchListener { _, event ->
                     sendTouchEvent(
                         event.actionMasked,

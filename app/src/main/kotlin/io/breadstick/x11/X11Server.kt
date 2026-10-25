@@ -2,6 +2,7 @@ package io.breadstick.x11
 
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.Looper
 import android.system.Os
 import android.util.Log
 import org.openstick.engine.LinuxEnvironment
@@ -16,16 +17,29 @@ class X11Server(
         @Volatile
         var isServerRunning: Boolean = false
             private set
+
+        private var entry: CmdEntryPoint? = null
     }
 
     private var serverThread: HandlerThread? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     val socketPath: File
         get() = File(env.tmpDir, ".X11-unix/X$display")
 
+    fun openRenderFd(): Int {
+        val cmdEntryPoint: CmdEntryPoint
+        synchronized(this) {
+            cmdEntryPoint = entry ?: CmdEntryPoint().also { entry = it }
+        }
+        val pfd = cmdEntryPoint.getXConnection()
+            ?: throw IllegalStateException("Failed to acquire X11 connection from CmdEntryPoint")
+        return pfd.detachFd()
+    }
+
     fun start(onStarted: ((Boolean) -> Unit)? = null) {
         if (isServerRunning) {
-            onStarted?.invoke(true)
+            mainHandler.post { onStarted?.invoke(true) }
             return
         }
 
@@ -38,13 +52,20 @@ class X11Server(
             File(env.tmpDir, ".X$display-lock").delete()
 
             Os.setenv("TMPDIR", env.tmpDir.absolutePath, true)
+            Os.setenv("BREADSTICK_ROOTLESS", "1", true)
 
-            val xkbDir = File(env.rootfsDir, "usr/share/X11/xkb")
-            if (xkbDir.isDirectory) {
-                Os.setenv("XKB_CONFIG_ROOT", xkbDir.absolutePath, true)
+            // Resolve XKB configuration root from Debian guest
+            val xkbCandidates = listOf(
+                File(env.rootfsDir, "usr/share/X11/xkb"),
+                File(env.rootfsDir, "usr/share/xkeyboard-config-2")
+            )
+            val validXkb = xkbCandidates.firstOrNull { it.isDirectory }
+            if (validXkb != null) {
+                Os.setenv("XKB_CONFIG_ROOT", validXkb.absolutePath, true)
             }
 
             val logFile = File(env.context.filesDir, "xserver.log")
+            try { logFile.writeText("") } catch (_: Throwable) {}
             Os.setenv("XLORIE_LOG_FILE", logFile.absolutePath, true)
 
             val thread = HandlerThread("openstick-x11").apply { start() }
@@ -56,16 +77,16 @@ class X11Server(
                     val success = CmdEntryPoint.start(arrayOf(":$display", "-ac", "-noreset"))
                     isServerRunning = success
                     Log.i(TAG, "CmdEntryPoint.start returned $success")
-                    onStarted?.invoke(success)
+                    mainHandler.post { onStarted?.invoke(success) }
                 } catch (e: Throwable) {
                     Log.e(TAG, "Failed to start X11 server", e)
                     isServerRunning = false
-                    onStarted?.invoke(false)
+                    mainHandler.post { onStarted?.invoke(false) }
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize X11 environment", e)
-            onStarted?.invoke(false)
+            mainHandler.post { onStarted?.invoke(false) }
         }
     }
 
