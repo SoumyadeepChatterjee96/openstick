@@ -25,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -133,6 +134,35 @@ fun TerminalScreen(
                 modifier = Modifier.size(32.dp)
             ) {
                 Icon(Icons.Default.Add, contentDescription = "New Tab", tint = MaterialTheme.colorScheme.primary)
+            }
+
+            // Font Size Stepper (A- / A+)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(palette.containerHigh)
+                    .padding(horizontal = 2.dp, vertical = 1.dp)
+            ) {
+                IconButton(
+                    onClick = { manager.fontSize = (manager.fontSize - 1).coerceAtLeast(8) },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Text("A-", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = palette.text)
+                }
+                Text(
+                    text = "${manager.fontSize}",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 2.dp)
+                )
+                IconButton(
+                    onClick = { manager.fontSize = (manager.fontSize + 1).coerceAtMost(26) },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Text("A+", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = palette.text)
+                }
             }
 
             // Split Mode toggle

@@ -987,12 +987,18 @@ fun HomeScreen(
 
                     OutlinedButton(
                         onClick = {
-                            scope.launch {
-                                actionMessage = "Repairing package database..."
-                                runner.start(
-                                    command = listOf("dpkg", "--configure", "-a"),
-                                    onOutput = { actionMessage = it }
-                                )
+                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                actionMessage = "Cleaning stale locks & repairing package database..."
+                                try {
+                                    val exitCode = runner.executeOneShot(
+                                        command = listOf("/bin/sh", "-c", "rm -f /var/lib/dpkg/lock* /var/lib/apt/lists/lock /var/cache/apt/archives/lock && dpkg --configure -a"),
+                                        asRoot = true,
+                                        onOutput = { actionMessage = it }
+                                    )
+                                    actionMessage = if (exitCode == 0) "Package database repaired successfully" else "Repair finished with exit code $exitCode"
+                                } catch (e: Throwable) {
+                                    actionMessage = "Repair failed: ${e.message}"
+                                }
                             }
                         },
                         modifier = Modifier.weight(1f)

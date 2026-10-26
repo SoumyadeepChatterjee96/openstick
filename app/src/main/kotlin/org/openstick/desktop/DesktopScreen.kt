@@ -549,6 +549,7 @@ fun DesktopScreen(
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
+                    .imePadding()
                     .navigationBarsPadding()
                     .padding(bottom = 12.dp)
             ) {
@@ -684,6 +685,18 @@ fun DesktopScreen(
                             DesktopKeyChip("↓") {
                                 lorieViewRef?.sendKeyEvent(108, 20, true, 0)
                                 lorieViewRef?.sendKeyEvent(108, 20, false, 0)
+                            }
+                            DesktopKeyChip("←") {
+                                lorieViewRef?.sendKeyEvent(105, 21, true, 0)
+                                lorieViewRef?.sendKeyEvent(105, 21, false, 0)
+                            }
+                            DesktopKeyChip("→") {
+                                lorieViewRef?.sendKeyEvent(106, 22, true, 0)
+                                lorieViewRef?.sendKeyEvent(106, 22, false, 0)
+                            }
+                            DesktopKeyChip("↵") {
+                                lorieViewRef?.sendKeyEvent(28, 66, true, 0)
+                                lorieViewRef?.sendKeyEvent(28, 66, false, 0)
                             }
 
                             VerticalDivider(modifier = Modifier.height(18.dp).padding(horizontal = 2.dp), color = palette.border)

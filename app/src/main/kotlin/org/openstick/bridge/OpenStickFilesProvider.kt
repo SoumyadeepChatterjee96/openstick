@@ -37,7 +37,7 @@ class OpenStickFilesProvider : DocumentsProvider() {
     }
 
     private val env by lazy { LinuxEnvironment(context!!) }
-    private val homeDir: File get() = env.getHomeDir("user")
+    private val homeDir: File get() = env.getHomeDir()
 
     override fun onCreate(): Boolean = true
 
@@ -48,7 +48,7 @@ class OpenStickFilesProvider : DocumentsProvider() {
         row.add(DocumentsContract.Root.COLUMN_DOCUMENT_ID, DOC_ROOT)
         row.add(DocumentsContract.Root.COLUMN_TITLE, "OpenStick Linux")
         row.add(DocumentsContract.Root.COLUMN_SUMMARY, "Linux user home directory")
-        row.add(DocumentsContract.Root.COLUMN_ICON, android.R.drawable.sym_def_app_icon)
+        row.add(DocumentsContract.Root.COLUMN_ICON, org.openstick.R.mipmap.ic_launcher)
         row.add(
             DocumentsContract.Root.COLUMN_FLAGS,
             DocumentsContract.Root.FLAG_SUPPORTS_CREATE or
@@ -119,6 +119,7 @@ class OpenStickFilesProvider : DocumentsProvider() {
     }
 
     override fun isChildDocument(parentDocumentId: String, documentId: String): Boolean {
+        if (parentDocumentId == DOC_ROOT) return true
         return documentId.startsWith(parentDocumentId)
     }
 
