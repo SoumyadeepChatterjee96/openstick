@@ -5,7 +5,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,13 +26,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import io.breadstick.x11.X11Server
 import org.openstick.apps.AppsScreen
 import org.openstick.desktop.DesktopScreen
@@ -94,6 +105,26 @@ class MainActivity : ComponentActivity() {
             var currentUiScale by remember { mutableStateOf(initialUiScale) }
             var currentScreen by remember { mutableStateOf(Screen.HOME) }
             var isNavMenuOpen by remember { mutableStateOf(false) }
+            var isBootSplashing by remember { mutableStateOf(true) }
+            val splashScaleAnim = remember { Animatable(0.85f) }
+            val splashAlphaAnim = remember { Animatable(0f) }
+
+            LaunchedEffect(Unit) {
+                launch {
+                    splashScaleAnim.animateTo(
+                        targetValue = 1f,
+                        animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing)
+                    )
+                }
+                launch {
+                    splashAlphaAnim.animateTo(
+                        targetValue = 1f,
+                        animationSpec = tween(durationMillis = 400)
+                    )
+                }
+                delay(800L)
+                isBootSplashing = false
+            }
 
             // Predictive Back gesture handler (minimizes instead of killing session)
             BackHandler {
@@ -468,6 +499,53 @@ class MainActivity : ComponentActivity() {
                                                 color = currentAccent.color
                                             )
                                         }
+                                    }
+                                }
+                            }
+
+                            // 4. In-App Boot Splash Overlay
+                            AnimatedVisibility(
+                                visible = isBootSplashing,
+                                enter = fadeIn(tween(100)),
+                                exit = fadeOut(tween(350))
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black)
+                                        .clickable { isBootSplashing = false },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Image(
+                                            painter = painterResource(id = R.drawable.ic_splash_icon),
+                                            contentDescription = "OpenStick Boot Splash Icon",
+                                            modifier = Modifier
+                                                .size(160.dp)
+                                                .graphicsLayer(
+                                                    scaleX = splashScaleAnim.value,
+                                                    scaleY = splashScaleAnim.value,
+                                                    alpha = splashAlphaAnim.value
+                                                )
+                                        )
+                                        Spacer(modifier = Modifier.height(20.dp))
+                                        Text(
+                                            text = "OPENSTICK",
+                                            fontSize = 22.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            letterSpacing = 4.sp,
+                                            color = Color.White
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = "ARM64 Linux Environment",
+                                            fontSize = 12.sp,
+                                            letterSpacing = 1.2.sp,
+                                            color = Color(0xFF00E5FF)
+                                        )
                                     }
                                 }
                             }

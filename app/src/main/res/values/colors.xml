@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="brand_icon_ink">#faf8f5</color>
-    <color name="brand_launch">#f6f4f1</color>
-    <color name="brand_launcher_from">#b4714c</color>
-    <color name="brand_launcher_to">#9a6480</color>
+    <color name="brand_icon_ink">#00F0FF</color>
+    <color name="brand_launch">#000000</color>
+    <color name="brand_launcher_from">#00F0FF</color>
+    <color name="brand_launcher_to">#7C4DFF</color>
     <color name="bsl_accent">#a6623f</color>
     <color name="bsl_appbar">#a6623f</color>
     <color name="bsl_bg">#f6f4f1</color>

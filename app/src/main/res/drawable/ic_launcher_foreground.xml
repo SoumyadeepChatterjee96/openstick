@@ -1,40 +1,127 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:height="108dp"
     android:width="108dp"
+    android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group
-        android:translateX="2"
-        android:translateY="2">
-        <path
-            android:pathData="M38,70 L70,38"
-            android:strokeColor="#000000"
-            android:strokeWidth="25"
-            android:strokeLineCap="round"
-            android:strokeAlpha="0.16"/>
-    </group>
+
+    <!-- 1. THE "O" RING (Open) -->
+    <!-- Ambient Ring Glow Shadow -->
     <path
-        android:pathData="M38,70 L70,38"
-        android:strokeColor="@color/brand_icon_ink"
-        android:strokeWidth="25"
-        android:strokeLineCap="round"/>
-    <path
-        android:pathData="M41,57 L51,67"
-        android:strokeColor="#000000"
-        android:strokeWidth="3.5"
+        android:strokeColor="#00F0FF"
+        android:strokeWidth="5"
+        android:strokeAlpha="0.18"
         android:strokeLineCap="round"
-        android:strokeAlpha="0.22"/>
+        android:pathData="M54,23 A31,31 0 1,0 54,85 A31,31 0 1,0 54,23 Z"/>
+
+    <!-- Radiant Cyber 'O' Torus Ring (Aperture gap from 35 to 55 deg) -->
     <path
-        android:pathData="M49,49 L59,59"
-        android:strokeColor="#000000"
-        android:strokeWidth="3.5"
+        android:strokeColor="#00F0FF"
+        android:strokeWidth="3.2"
         android:strokeLineCap="round"
-        android:strokeAlpha="0.22"/>
+        android:pathData="M73,34 A30,30 0 1,0 54,84 A30,30 0 0,0 79,43"/>
+
+    <!-- Complementary Violet Sector on O Ring -->
     <path
-        android:pathData="M57,41 L67,51"
-        android:strokeColor="#000000"
-        android:strokeWidth="3.5"
+        android:strokeColor="#7C4DFF"
+        android:strokeWidth="3.2"
         android:strokeLineCap="round"
-        android:strokeAlpha="0.22"/>
+        android:pathData="M54,84 A30,30 0 0,0 84,54"/>
+
+    <!-- Aperture Gap Glowing Node Dots -->
+    <path
+        android:fillColor="#00F0FF"
+        android:pathData="M73,34 A1.6,1.6 0 1,0 76.2,34 A1.6,1.6 0 1,0 73,34 Z"/>
+    <path
+        android:fillColor="#7C4DFF"
+        android:pathData="M79,43 A1.6,1.6 0 1,0 82.2,43 A1.6,1.6 0 1,0 79,43 Z"/>
+
+    <!-- 2. THE "STICK" (Compute Module / Silicon Blade) -->
+    <!-- Top Connector Housing (Gold Pin Header) -->
+    <path
+        android:fillColor="#151D2E"
+        android:strokeColor="#2E3C56"
+        android:strokeWidth="0.8"
+        android:pathData="M46,20 L62,20 L62,28 L46,28 Z"/>
+
+    <!-- Gold Bus Contacts -->
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M48,21 L50,21 L50,26 L48,26 Z"/>
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M51.5,21 L53.5,21 L53.5,26 L51.5,26 Z"/>
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M54.5,21 L56.5,21 L56.5,26 L54.5,26 Z"/>
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M58,21 L60,21 L60,26 L58,26 Z"/>
+
+    <!-- Main Silicon Stick Body -->
+    <path
+        android:fillColor="#0F172A"
+        android:strokeColor="#00F0FF"
+        android:strokeWidth="1.2"
+        android:pathData="M44,28 C42.5,28 41,29.5 41,31 L41,75 C41,76.5 42.5,78 44,78 L64,78 C65.5,78 67,76.5 67,75 L67,31 C67,29.5 65.5,28 64,28 Z"/>
+
+    <!-- Stick Bottom Lanyard / Keyring Loop -->
+    <path
+        android:strokeColor="#00F0FF"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:pathData="M51,78 C51,82 57,82 57,78"/>
+
+    <!-- Heat Sink Notches -->
+    <path
+        android:strokeColor="#00F0FF"
+        android:strokeWidth="0.8"
+        android:strokeLineCap="round"
+        android:pathData="M39.5,46 L41,46 M39.5,52 L41,52 M39.5,58 L41,58"/>
+    <path
+        android:strokeColor="#7C4DFF"
+        android:strokeWidth="0.8"
+        android:strokeLineCap="round"
+        android:pathData="M67,46 L68.5,46 M67,52 L68.5,52 M67,58 L68.5,58"/>
+
+    <!-- 3. TERMINAL DISPLAY SCREEN -->
+    <path
+        android:fillColor="#030712"
+        android:strokeColor="#1E293B"
+        android:strokeWidth="0.8"
+        android:pathData="M43.5,33 C42.7,33 42,33.7 42,34.5 L42,71.5 C42,72.3 42.7,73 43.5,73 L64.5,73 C65.3,73 66,72.3 66,71.5 L66,34.5 C66,33.7 65.3,33 64.5,33 Z"/>
+
+    <!-- Terminal Status LEDs -->
+    <path
+        android:fillColor="#00E676"
+        android:pathData="M45,36 A1,1 0 1,0 47,36 A1,1 0 1,0 45,36 Z"/>
+    <path
+        android:fillColor="#00F0FF"
+        android:pathData="M48.5,36 A0.8,0.8 0 1,0 50.1,36 A0.8,0.8 0 1,0 48.5,36 Z"/>
+
+    <!-- CLI Command Prompt: '>' (Crisp White) and '_' (Neon Green) -->
+    <!-- Chevron '>' -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M47,48 L53,53 L47,58"/>
+
+    <!-- Cursor '_' (Neon Emerald) -->
+    <path
+        android:strokeColor="#00E676"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:pathData="M56,58 L62,58"/>
+
+    <!-- Linux Kernel Matrix Lines (Bottom of screen) -->
+    <path
+        android:fillColor="#00E676"
+        android:fillAlpha="0.75"
+        android:pathData="M48,65 L58,65 L58,66.2 L48,66.2 Z"/>
+    <path
+        android:fillColor="#7C4DFF"
+        android:fillAlpha="0.75"
+        android:pathData="M50,67.8 L56,67.8 L56,69 L50,69 Z"/>
 </vector>

@@ -260,6 +260,7 @@ fun DesktopScreen(
             var lastTapUpX by remember { mutableFloatStateOf(0f) }
             var lastTapUpY by remember { mutableFloatStateOf(0f) }
             var isDragging by remember { mutableStateOf(false) }
+            var isTrackpadDragging by remember { mutableStateOf(false) }
             var hasTriggeredLongPress by remember { mutableStateOf(false) }
             var longPressJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
             var twoFingerDownTime by remember { mutableLongStateOf(0L) }
@@ -295,9 +296,7 @@ fun DesktopScreen(
                                         sendMouseEvent(event.x, event.y, button, true, false)
                                     }
                                     MotionEvent.ACTION_MOVE -> {
-                                        val isDown = event.buttonState != 0
-                                        val btn = if (isDown) lastPhysicalMouseButton else 0
-                                        sendMouseEvent(event.x, event.y, btn, isDown, false)
+                                        sendMouseEvent(event.x, event.y, 0, false, false)
                                     }
                                     MotionEvent.ACTION_UP, MotionEvent.ACTION_BUTTON_RELEASE -> {
                                         sendMouseEvent(event.x, event.y, lastPhysicalMouseButton, false, false)
@@ -317,9 +316,18 @@ fun DesktopScreen(
                                     prevTouchX = event.x
                                     prevTouchY = event.y
                                     isDragging = false
+                                    isTrackpadDragging = false
                                     hasTriggeredLongPress = false
 
-                                    if (!isTrackpadMode) {
+                                    if (isTrackpadMode) {
+                                        val now = System.currentTimeMillis()
+                                        val isDoubleTap = (now - lastTapUpTime < 350L) &&
+                                            (kotlin.math.hypot(event.x - lastTapUpX, event.y - lastTapUpY) < touchSlop * 2.5f)
+                                        if (isDoubleTap) {
+                                            isTrackpadDragging = true
+                                            sendMouseEvent(cursorX, cursorY, 1, true, false)
+                                        }
+                                    } else {
                                         val now = System.currentTimeMillis()
                                         val isDoubleTap = (now - lastTapUpTime < 450L) &&
                                             (kotlin.math.hypot(event.x - lastTapUpX, event.y - lastTapUpY) < touchSlop * 2.5f)
@@ -363,6 +371,10 @@ fun DesktopScreen(
                                             sendMouseEvent(cursorX, cursorY, 1, false, false)
                                             isDragging = false
                                         }
+                                        if (isTrackpadDragging) {
+                                            sendMouseEvent(cursorX, cursorY, 1, false, false)
+                                            isTrackpadDragging = false
+                                        }
                                     }
                                 }
 
@@ -384,7 +396,7 @@ fun DesktopScreen(
                                             val dx = event.x - downX
                                             val dy = event.y - downY
                                             val distSq = dx * dx + dy * dy
-                                            if (distSq > touchSlop * touchSlop) {
+                                            if (isDragging || distSq > touchSlop * touchSlop) {
                                                 longPressJob?.cancel()
                                                 if (!hasTriggeredLongPress) {
                                                     cursorX = event.x
@@ -395,7 +407,7 @@ fun DesktopScreen(
                                                         isDragging = true
                                                         sendMouseEvent(downX, downY, 1, true, false)
                                                     }
-                                                    sendMouseEvent(cursorX, cursorY, 1, true, false)
+                                                    sendMouseEvent(cursorX, cursorY, 0, false, false)
                                                 }
                                             } else {
                                                 cursorX = event.x
@@ -436,11 +448,19 @@ fun DesktopScreen(
                                     longPressJob?.cancel()
                                     if (pointerCount == 1 && !hasTriggeredLongPress) {
                                         if (isTrackpadMode) {
-                                            val dx = event.x - downX
-                                            val dy = event.y - downY
-                                            if (dx * dx + dy * dy <= touchSlop * touchSlop) {
-                                                sendMouseEvent(cursorX, cursorY, 1, true, false)
+                                            if (isTrackpadDragging) {
                                                 sendMouseEvent(cursorX, cursorY, 1, false, false)
+                                                isTrackpadDragging = false
+                                            } else {
+                                                val dx = event.x - downX
+                                                val dy = event.y - downY
+                                                if (dx * dx + dy * dy <= touchSlop * touchSlop) {
+                                                    sendMouseEvent(cursorX, cursorY, 1, true, false)
+                                                    sendMouseEvent(cursorX, cursorY, 1, false, false)
+                                                    lastTapUpTime = System.currentTimeMillis()
+                                                    lastTapUpX = event.x
+                                                    lastTapUpY = event.y
+                                                }
                                             }
                                         } else {
                                             if (isDragging) {
@@ -473,6 +493,10 @@ fun DesktopScreen(
                                     if (isDragging) {
                                         sendMouseEvent(cursorX, cursorY, 1, false, false)
                                         isDragging = false
+                                    }
+                                    if (isTrackpadDragging) {
+                                        sendMouseEvent(cursorX, cursorY, 1, false, false)
+                                        isTrackpadDragging = false
                                     }
                                     hasTriggeredLongPress = false
                                 }
