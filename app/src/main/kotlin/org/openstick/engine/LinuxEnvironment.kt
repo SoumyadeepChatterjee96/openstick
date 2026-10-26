@@ -119,6 +119,40 @@ class LinuxEnvironment(val context: Context) {
         }
     }
 
+    fun copyAsset(assetPath: String, dest: File) {
+        try {
+            dest.parentFile?.mkdirs()
+            context.assets.open(assetPath).use { input ->
+                FileOutputStream(dest).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            dest.setExecutable(true, false)
+        } catch (_: Exception) {}
+    }
+
+    fun installDesktopScripts() {
+        try {
+            File(rootfsDir, "root/.breadstick").mkdirs()
+            copyAsset("desktop/provision.sh", File(rootfsDir, "root/.breadstick/provision.sh"))
+            copyAsset("desktop/start-desktop-x11.sh", File(rootfsDir, "root/.breadstick/start-desktop-x11.sh"))
+            File(rootfsDir, "usr/local/bin").mkdirs()
+            copyAsset("desktop/start-desktop-x11.sh", File(rootfsDir, "usr/local/bin/start-desktop-x11"))
+            copyAsset("desktop/list-apps.sh", File(rootfsDir, "usr/local/bin/breadstick-list-apps"))
+            copyAsset("desktop/bsl-status.sh", File(rootfsDir, "usr/local/bin/bsl-status"))
+            val xfwm4Wrapper = File(rootfsDir, "usr/local/bin/xfwm4")
+            xfwm4Wrapper.writeText("#!/bin/sh\nexec /usr/bin/xfwm4 --compositor=off \"\$@\"\n")
+            xfwm4Wrapper.setExecutable(true, false)
+            File(rootfsDir, "usr/lib/breadstick").mkdirs()
+            copyAsset("desktop/start-desktop-x11.sh", File(rootfsDir, "usr/lib/breadstick/start-desktop-x11.sh"))
+        } catch (_: Exception) {}
+    }
+
+    fun startDesktopCommand(display: Int = 0, user: String = "root"): String {
+        installDesktopScripts()
+        return "rm -f /tmp/runtime-*/bus /tmp/.X$display-lock 2>/dev/null; export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export DISPLAY=:$display; export BREADSTICK_DARK=1; export BREADSTICK_DPI=192; export BREADSTICK_LOCALE=C.UTF-8; F=/usr/lib/breadstick/start-desktop-x11.sh; [ -f \"\$F\" ] || F=/usr/local/bin/start-desktop-x11; [ -f \"\$F\" ] || F=/root/.breadstick/start-desktop-x11.sh; if [ -f \"\$F\" ]; then exec sh \"\$F\" $display $user 0; else exec startxfce4 2>/dev/null || exec openbox-session 2>/dev/null || exec twm; fi"
+    }
+
     private fun procStandIns(): List<String> {
         val standinDir = File(context.filesDir, "proc-standin")
         standinDir.mkdirs()
@@ -264,7 +298,6 @@ class LinuxEnvironment(val context: Context) {
             "DISPLAY" to display,
             "TMPDIR" to "/tmp",
             "LANG" to "C.UTF-8",
-            "PULSE_SERVER" to "tcp:127.0.0.1:4713",
             "MOZ_DISABLE_CONTENT_SANDBOX" to "1",
             "ELECTRON_DISABLE_SANDBOX" to "1"
         )

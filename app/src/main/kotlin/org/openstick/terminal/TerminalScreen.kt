@@ -16,7 +16,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PictureInPicture
 import androidx.compose.material.icons.filled.Splitscreen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -46,7 +48,8 @@ import org.openstick.ui.theme.AmoledContainer
 @Composable
 fun TerminalScreen(
     manager: TerminalSessionManager,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNavigateHome: () -> Unit = {}
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
@@ -55,6 +58,9 @@ fun TerminalScreen(
         modifier = modifier
             .fillMaxSize()
             .background(AmoledBackground)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .imePadding()
     ) {
         // Tab & Layout Bar
         Row(
@@ -64,6 +70,17 @@ fun TerminalScreen(
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            IconButton(
+                onClick = onNavigateHome,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    Icons.Default.ArrowBack,
+                    contentDescription = "Back to Home",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Spacer(modifier = Modifier.width(4.dp))
             Row(
                 modifier = Modifier
                     .weight(1f)
@@ -129,6 +146,25 @@ fun TerminalScreen(
                     Icons.Default.Splitscreen,
                     contentDescription = "Split Layout",
                     tint = if (manager.splitMode != SplitMode.SINGLE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Pop-up Floating Window
+            val context = androidx.compose.ui.platform.LocalContext.current
+            IconButton(
+                onClick = {
+                    org.openstick.ui.WindowActivity.launch(
+                        context = context,
+                        mode = org.openstick.ui.WindowActivity.MODE_TERMINAL,
+                        title = "Linux Terminal"
+                    )
+                },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    Icons.Default.PictureInPicture,
+                    contentDescription = "Pop-up Window",
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -365,6 +401,14 @@ fun InteractiveTerminalPane(
             val calcCols = (constraints.maxWidth / charWidthPx).toInt().coerceIn(20, 240)
             val calcRows = (constraints.maxHeight / charHeightPx).toInt().coerceIn(10, 100)
             tab.resize(calcCols, calcRows)
+        }
+
+        // Auto-scroll to keep active command line visible when typing or keyboard opens
+        val totalLines = snapshot.scrollback.size + snapshot.screen.size
+        LaunchedEffect(totalLines, snapshot.cursorRow, maxHeight) {
+            if (totalLines > 0) {
+                listState.scrollToItem(totalLines - 1)
+            }
         }
 
         // Real ANSI Screen Rendering via LazyColumn

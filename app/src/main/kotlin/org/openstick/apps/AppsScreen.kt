@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import org.openstick.engine.LinuxEnvironment
 import org.openstick.engine.ProotRunner
+import org.openstick.ui.WindowActivity
 import org.openstick.ui.theme.AmoledBackground
 import org.openstick.ui.theme.AmoledContainer
 import org.openstick.ui.theme.AmoledContainerHigh
@@ -210,15 +211,7 @@ fun AppsScreen(
                             "python" -> "xterm -e python3"
                             else -> app.id
                         }
-                        scope.launch {
-                            runner.start(
-                                command = listOf(
-                                    "/bin/sh",
-                                    "-c",
-                                    "export DISPLAY=:0; eval $(dbus-launch --sh-syntax 2>/dev/null); (exec $launchExec 2>&1 &)"
-                                )
-                            )
-                        }
+                        WindowActivity.launch(context, WindowActivity.MODE_APP, cmd = launchExec, title = app.name)
                     }
                 )
             }

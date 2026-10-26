@@ -35,6 +35,7 @@ import org.openstick.engine.HardwareBridges
 import org.openstick.engine.LinuxEnvironment
 import org.openstick.engine.ProotRunner
 import org.openstick.engine.SessionService
+import org.openstick.ui.WindowActivity
 import org.openstick.ui.theme.AmoledBackground
 import org.openstick.ui.theme.AmoledContainer
 import org.openstick.ui.theme.AmoledContainerHigh
@@ -44,7 +45,7 @@ fun HomeScreen(
     env: LinuxEnvironment,
     runner: ProotRunner,
     onNavigateTerminal: () -> Unit,
-    onNavigateDesktop: (isWindowed: Boolean) -> Unit,
+    onNavigateDesktop: () -> Unit,
     onNavigateApps: () -> Unit,
     onNavigateMonitor: () -> Unit,
     modifier: Modifier = Modifier
@@ -196,16 +197,18 @@ fun HomeScreen(
                 subtitle = "Full screen",
                 active = true,
                 modifier = Modifier.weight(1f),
-                onClick = { onNavigateDesktop(false) }
+                onClick = onNavigateDesktop
             )
 
             LaunchTile(
                 imageVector = Icons.Default.PictureInPicture,
                 title = "Floating",
-                subtitle = "One window per app",
+                subtitle = "Pop-up terminal",
                 active = false,
                 modifier = Modifier.weight(1f),
-                onClick = { onNavigateDesktop(true) }
+                onClick = {
+                    WindowActivity.launch(context, WindowActivity.MODE_TERMINAL, title = "Floating Terminal")
+                }
             )
 
             LaunchTile(

@@ -78,6 +78,25 @@ fun MonitorScreen(
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                IconButton(
+                    onClick = {
+                        org.openstick.ui.WindowActivity.launch(
+                            context = context,
+                            mode = org.openstick.ui.WindowActivity.MODE_MONITOR,
+                            title = "Resource Monitor"
+                        )
+                    },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.PictureInPicture,
+                        contentDescription = "Pop-up Window",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(6.dp))
                 Badge(containerColor = Color(0xFF1B5E20)) {
                     Text(
                         text = "LIVE",

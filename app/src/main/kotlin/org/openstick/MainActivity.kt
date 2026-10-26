@@ -4,8 +4,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -49,6 +53,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
 
         val prefs = getSharedPreferences("openstick_prefs", MODE_PRIVATE)
         val initialThemeOrdinal = prefs.getInt("theme_mode", AppThemeMode.AMOLED_BLACK.ordinal)
@@ -62,7 +67,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             var currentTheme by remember { mutableStateOf(initialTheme) }
             var currentScreen by remember { mutableStateOf(Screen.HOME) }
-            var desktopWindowedMode by remember { mutableStateOf(false) }
+
 
             // Predictive Back gesture handler (minimizes instead of killing session)
             BackHandler {
@@ -78,36 +83,42 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     containerColor = AmoledBackground,
                     bottomBar = {
-                        NavigationBar(
-                            containerColor = AmoledContainer
-                        ) {
-                            Screen.values().forEach { screen ->
-                                val selected = currentScreen == screen
-                                NavigationBarItem(
-                                    selected = selected,
-                                    onClick = { currentScreen = screen },
-                                    icon = { Icon(screen.icon, contentDescription = screen.title) },
-                                    label = { Text(screen.title) },
-                                    colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = MaterialTheme.colorScheme.onPrimary,
-                                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                                        indicatorColor = MaterialTheme.colorScheme.primary,
-                                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        val isImeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+                        if (!isImeVisible && currentScreen != Screen.DESKTOP && currentScreen != Screen.TERMINAL) {
+                            NavigationBar(
+                                containerColor = AmoledContainer
+                            ) {
+                                Screen.values().forEach { screen ->
+                                    val selected = currentScreen == screen
+                                    NavigationBarItem(
+                                        selected = selected,
+                                        onClick = { currentScreen = screen },
+                                        icon = { Icon(screen.icon, contentDescription = screen.title) },
+                                        label = { Text(screen.title) },
+                                        colors = NavigationBarItemDefaults.colors(
+                                            selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                                            indicatorColor = MaterialTheme.colorScheme.primary,
+                                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     )
-                                )
+                                }
                             }
                         }
                     }
                 ) { paddingValues ->
-                    val modifier = Modifier.padding(paddingValues)
+                    val modifier = if (currentScreen == Screen.TERMINAL || currentScreen == Screen.DESKTOP) {
+                        Modifier.fillMaxSize()
+                    } else {
+                        Modifier.fillMaxSize().padding(paddingValues)
+                    }
                     when (currentScreen) {
                         Screen.HOME -> HomeScreen(
                             env = env,
                             runner = mainRunner,
                             onNavigateTerminal = { currentScreen = Screen.TERMINAL },
-                            onNavigateDesktop = { isWindowed ->
-                                desktopWindowedMode = isWindowed
+                            onNavigateDesktop = {
                                 currentScreen = Screen.DESKTOP
                             },
                             onNavigateApps = { currentScreen = Screen.APPS },
@@ -121,13 +132,13 @@ class MainActivity : ComponentActivity() {
                         )
                         Screen.TERMINAL -> TerminalScreen(
                             manager = terminalManager,
-                            modifier = modifier
+                            modifier = modifier,
+                            onNavigateHome = { currentScreen = Screen.HOME }
                         )
                         Screen.DESKTOP -> DesktopScreen(
                             env = env,
                             x11Server = x11Server,
                             runner = mainRunner,
-                            initialWindowed = desktopWindowedMode,
                             modifier = modifier
                         )
                         Screen.MONITOR -> MonitorScreen(

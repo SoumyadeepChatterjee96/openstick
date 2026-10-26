@@ -596,7 +596,7 @@ fi
 # socket from a dead daemon causes "Connection refused", so probe then restart if needed.
 mkdir -p /run/dbus /var/lib/dbus
 dbus-uuidgen --ensure 2>/dev/null || true
-if ! dbus-send --system --print-reply --dest=org.freedesktop.DBus \
+if ! dbus-send --system --print-reply --reply-timeout=2000 --dest=org.freedesktop.DBus \
         /org/freedesktop/DBus org.freedesktop.DBus.ListNames >/dev/null 2>&1; then
     rm -f /run/dbus/pid /run/dbus/system_bus_socket 2>/dev/null || true
     dbus-daemon --system --fork 2>/dev/null || true
@@ -1668,7 +1668,7 @@ export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
 # The configuration lets in programs from the other proots of the app (the Apps drawer, Floating
 # windows, Terminal tabs), which the stock one refused; package-fixups writes it and says why.
 # Without that file, or if it will not load, the stock session configuration as before.
-if ! dbus-send --session --print-reply --dest=org.freedesktop.DBus \
+if ! dbus-send --session --print-reply --reply-timeout=2000 --dest=org.freedesktop.DBus \
         /org/freedesktop/DBus org.freedesktop.DBus.ListNames >/dev/null 2>&1; then
     rm -f "$XDG_RUNTIME_DIR/bus" 2>/dev/null || true
     dbus-daemon --config-file=/usr/local/lib/breadstick/session-bus.conf \

@@ -57,6 +57,7 @@ import org.openstick.engine.LinuxEnvironment
 import org.openstick.engine.ProcessInfo
 import org.openstick.engine.ProotRunner
 import org.openstick.engine.ResourceMonitor
+import org.openstick.ui.WindowActivity
 import org.openstick.ui.theme.AmoledBackground
 import org.openstick.ui.theme.AmoledContainer
 import org.openstick.ui.theme.AmoledContainerHigh
@@ -100,15 +101,44 @@ fun DesktopScreen(
     env: LinuxEnvironment,
     x11Server: X11Server,
     runner: ProotRunner,
-    initialWindowed: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var isX11Running by remember { mutableStateOf(X11Server.isServerRunning) }
     var isGpuRunning by remember { mutableStateOf(GpuServer.isRunning) }
-    var displayMode by remember { mutableStateOf(if (initialWindowed) DesktopDisplayMode.WINDOWED_MODE else DesktopDisplayMode.FULL_DESKTOP) }
-    var desktopStatus by remember { mutableStateOf("Desktop ready") }
-    var showSurface by remember { mutableStateOf(false) }
+    var desktopStatus by remember { mutableStateOf("Desktop initializing...") }
+    var showSurface by remember { mutableStateOf(X11Server.isServerRunning) }
+
+    // Auto-boot graphical desktop on screen entry
+    LaunchedEffect(Unit) {
+        if (!X11Server.isServerRunning) {
+            desktopStatus = "Starting graphics engine..."
+            x11Server.start { success ->
+                isX11Running = success
+                if (success) {
+                    showSurface = true
+                    desktopStatus = "X11 Display :0 Ready • Launching Desktop..."
+                    scope.launch(Dispatchers.IO) {
+                        runner.start(
+                            command = listOf(
+                                "/bin/sh",
+                                "-c",
+                                env.startDesktopCommand(0, "root")
+                            ),
+                            asRoot = true,
+                            onOutput = { desktopStatus = "Desktop session active" }
+                        )
+                    }
+                } else {
+                    desktopStatus = "X11 server standby"
+                }
+            }
+        } else {
+            showSurface = true
+            desktopStatus = "Display active (:0)"
+        }
+    }
 
     // Desktop View & Input State
     var lorieViewRef by remember { mutableStateOf<LorieView?>(null) }
@@ -121,28 +151,14 @@ fun DesktopScreen(
     val focusRequester = remember { FocusRequester() }
     var inputFieldValue by remember { mutableStateOf(TextFieldValue("")) }
 
-    // Windowed Mini Floating Windows list
-    var nextZIndex by remember { mutableFloatStateOf(2f) }
-    val miniWindows = remember {
-        mutableStateListOf(
-            MiniWindowState(
-                id = "term-1",
-                type = MiniWindowType.TERMINAL,
-                title = "Terminal Shell",
-                icon = Icons.Default.Terminal,
-                offsetX = 20f,
-                offsetY = 10f,
-                widthDp = 330f,
-                heightDp = 360f,
-                zIndex = 1f
-            )
-        )
-    }
+
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(AmoledBackground)
+            .statusBarsPadding()
+            .navigationBarsPadding()
             .padding(8.dp)
     ) {
         // Controls Header Card
@@ -186,28 +202,7 @@ fun DesktopScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Mode Selector Chips
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = displayMode == DesktopDisplayMode.FULL_DESKTOP,
-                        onClick = { displayMode = DesktopDisplayMode.FULL_DESKTOP },
-                        label = { Text("Full Desktop", fontSize = 11.sp) },
-                        leadingIcon = { Icon(Icons.Default.DesktopWindows, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                        modifier = Modifier.weight(1f)
-                    )
-                    FilterChip(
-                        selected = displayMode == DesktopDisplayMode.WINDOWED_MODE,
-                        onClick = { displayMode = DesktopDisplayMode.WINDOWED_MODE },
-                        label = { Text("Windowed Floating", fontSize = 11.sp) },
-                        leadingIcon = { Icon(Icons.Default.PictureInPicture, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
 
-                Spacer(modifier = Modifier.height(8.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -231,8 +226,9 @@ fun DesktopScreen(
                                                 command = listOf(
                                                     "/bin/sh",
                                                     "-c",
-                                                    "DISPLAY=:0 startxfce4 --disable-tcp 2>&1 || ((sleep 1; DISPLAY=:0 xfce4-terminal 2>/dev/null || DISPLAY=:0 xterm 2>/dev/null &); DISPLAY=:0 exec openbox)"
+                                                    env.startDesktopCommand(0, "root")
                                                 ),
+                                                asRoot = true,
                                                 onOutput = { desktopStatus = "Desktop session active" }
                                             )
                                         }
@@ -291,246 +287,58 @@ fun DesktopScreen(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        if (displayMode == DesktopDisplayMode.WINDOWED_MODE) {
-            // Windowed Mini Floating Workspace Bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+        // FULL DESKTOP ENVIRONMENT
+        // Quick Launch Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            FilledTonalButton(
+                onClick = {
+                    scope.launch {
+                        if (!isX11Running) x11Server.start { isX11Running = it }
+                        showSurface = true
+                        desktopStatus = "Starting XFCE4 Desktop..."
+                        runner.kill()
+                        runner.start(
+                            command = listOf(
+                                "/bin/sh",
+                                "-c",
+                                env.startDesktopCommand(0, "root")
+                            ),
+                            asRoot = true,
+                            onOutput = { desktopStatus = "XFCE session active" }
+                        )
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
             ) {
-                ActionChip(
-                    icon = Icons.Default.Add,
-                    label = "Terminal",
-                    onClick = {
-                        miniWindows.add(
-                            MiniWindowState(
-                                id = "term-${System.currentTimeMillis()}",
-                                type = MiniWindowType.TERMINAL,
-                                title = "Terminal Shell",
-                                icon = Icons.Default.Terminal,
-                                offsetX = (20 + (miniWindows.size * 25) % 80).toFloat(),
-                                offsetY = (20 + (miniWindows.size * 25) % 120).toFloat(),
-                                zIndex = nextZIndex++
-                            )
-                        )
-                    }
-                )
-
-                ActionChip(
-                    icon = Icons.Default.Add,
-                    label = "Monitor",
-                    onClick = {
-                        miniWindows.add(
-                            MiniWindowState(
-                                id = "mon-${System.currentTimeMillis()}",
-                                type = MiniWindowType.MONITOR,
-                                title = "Process Monitor",
-                                icon = Icons.Default.Speed,
-                                offsetX = (30 + (miniWindows.size * 20) % 90).toFloat(),
-                                offsetY = (40 + (miniWindows.size * 20) % 130).toFloat(),
-                                zIndex = nextZIndex++
-                            )
-                        )
-                    }
-                )
-
-                ActionChip(
-                    icon = Icons.Default.Add,
-                    label = "Updater",
-                    onClick = {
-                        miniWindows.add(
-                            MiniWindowState(
-                                id = "upd-${System.currentTimeMillis()}",
-                                type = MiniWindowType.UPDATER,
-                                title = "Package Tool",
-                                icon = Icons.Default.SystemUpdate,
-                                offsetX = (40 + (miniWindows.size * 20) % 100).toFloat(),
-                                offsetY = (60 + (miniWindows.size * 20) % 140).toFloat(),
-                                zIndex = nextZIndex++
-                            )
-                        )
-                    }
-                )
-
-                ActionChip(
-                    icon = Icons.Default.Add,
-                    label = "Camera",
-                    onClick = {
-                        miniWindows.add(
-                            MiniWindowState(
-                                id = "cam-${System.currentTimeMillis()}",
-                                type = MiniWindowType.CAMERA,
-                                title = "Camera Bridge",
-                                icon = Icons.Default.CameraAlt,
-                                offsetX = (50 + (miniWindows.size * 20) % 100).toFloat(),
-                                offsetY = (70 + (miniWindows.size * 20) % 140).toFloat(),
-                                zIndex = nextZIndex++
-                            )
-                        )
-                    }
-                )
-
-                ActionChip(
-                    icon = Icons.Default.Add,
-                    label = "X11 Viewport",
-                    onClick = {
-                        if (!isX11Running) {
-                            x11Server.start { isX11Running = it }
-                        }
-                        miniWindows.add(
-                            MiniWindowState(
-                                id = "x11-${System.currentTimeMillis()}",
-                                type = MiniWindowType.X11,
-                                title = "X11 Canvas",
-                                icon = Icons.Default.DesktopWindows,
-                                offsetX = 20f,
-                                offsetY = 20f,
-                                widthDp = 340f,
-                                heightDp = 380f,
-                                zIndex = nextZIndex++
-                            )
-                        )
-                    }
-                )
+                Text("XFCE4", fontSize = 12.sp)
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Multi-window Floating Desktop Canvas
-            BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.Black)
-                    .border(1.dp, AmoledContainerHigh, RoundedCornerShape(12.dp))
+            FilledTonalButton(
+                onClick = {
+                    scope.launch {
+                        if (!isX11Running) x11Server.start { isX11Running = it }
+                        showSurface = true
+                        desktopStatus = "Starting Openbox + Terminal..."
+                        runner.kill()
+                        runner.start(
+                            command = listOf(
+                                "/bin/sh",
+                                "-c",
+                                "export DISPLAY=:0; eval $(dbus-launch --sh-syntax 2>/dev/null); (sleep 1; xfce4-terminal 2>/dev/null || xterm 2>/dev/null &); exec openbox"
+                            ),
+                            onOutput = { desktopStatus = "Openbox active" }
+                        )
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
             ) {
-                val canvasWidth = maxWidth
-                val canvasHeight = maxHeight
-
-                // Render each active floating mini window
-                miniWindows.forEach { win ->
-                    if (!win.isMinimized) {
-                        key(win.id) {
-                            MiniFloatingWindow(
-                                windowState = win,
-                                env = env,
-                                x11Server = x11Server,
-                                runner = runner,
-                                canvasWidthDp = canvasWidth.value,
-                                canvasHeightDp = canvasHeight.value,
-                                onFocus = {
-                                    win.zIndex = nextZIndex++
-                                },
-                                onMinimize = {
-                                    win.isMinimized = true
-                                },
-                                onToggleMaximize = {
-                                    win.isMaximized = !win.isMaximized
-                                    win.zIndex = nextZIndex++
-                                },
-                                onClose = {
-                                    miniWindows.remove(win)
-                                }
-                            )
-                        }
-                    }
-                }
-
-                // Minimized Windows Taskbar Dock at bottom of canvas
-                val minimizedList = miniWindows.filter { it.isMinimized }
-                if (minimizedList.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(8.dp)
-                            .background(AmoledContainer.copy(alpha = 0.9f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Dock:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        minimizedList.forEach { win ->
-                            AssistChip(
-                                onClick = {
-                                    win.isMinimized = false
-                                    win.zIndex = nextZIndex++
-                                },
-                                label = { Text(win.title, fontSize = 11.sp) },
-                                leadingIcon = { Icon(win.icon, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                                modifier = Modifier.height(28.dp)
-                            )
-                        }
-                    }
-                }
+                Text("Openbox", fontSize = 12.sp)
             }
-        } else {
-            // FULL DESKTOP MODE
-            // Quick Launch Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                FilledTonalButton(
-                    onClick = {
-                        scope.launch {
-                            try {
-                                File(env.tmpDir, ".X0-lock").delete()
-                                File(env.tmpDir, ".X11-unix/X0").delete()
-                                File(env.rootfsDir, "tmp/.X0-lock").delete()
-                                File(env.rootfsDir, "tmp/.X11-unix/X0").delete()
-                            } catch (_: Exception) {}
-
-                            if (!isX11Running) x11Server.start { isX11Running = it }
-                            showSurface = true
-                            desktopStatus = "Starting XFCE4 Desktop..."
-                            runner.kill()
-                            runner.start(
-                                command = listOf(
-                                    "/bin/sh",
-                                    "-c",
-                                    "export DISPLAY=:0; eval $(dbus-launch --sh-syntax 2>/dev/null); exec startxfce4 --disable-tcp 2>&1"
-                                ),
-                                onOutput = { desktopStatus = "XFCE session active" }
-                            )
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
-                ) {
-                    Text("XFCE4", fontSize = 12.sp)
-                }
-
-                FilledTonalButton(
-                    onClick = {
-                        scope.launch {
-                            try {
-                                File(env.tmpDir, ".X0-lock").delete()
-                                File(env.tmpDir, ".X11-unix/X0").delete()
-                                File(env.rootfsDir, "tmp/.X0-lock").delete()
-                                File(env.rootfsDir, "tmp/.X11-unix/X0").delete()
-                            } catch (_: Exception) {}
-
-                            if (!isX11Running) x11Server.start { isX11Running = it }
-                            showSurface = true
-                            desktopStatus = "Starting Openbox + Terminal..."
-                            runner.kill()
-                            runner.start(
-                                command = listOf(
-                                    "/bin/sh",
-                                    "-c",
-                                    "export DISPLAY=:0; eval $(dbus-launch --sh-syntax 2>/dev/null); (sleep 1; xfce4-terminal 2>/dev/null || xterm 2>/dev/null &); exec openbox"
-                                ),
-                                onOutput = { desktopStatus = "Openbox active" }
-                            )
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
-                ) {
-                    Text("Openbox", fontSize = 12.sp)
-                }
 
                 OutlinedButton(
                     onClick = {
@@ -821,7 +629,6 @@ fun DesktopScreen(
             }
         }
     }
-}
 
 @Composable
 private fun ActionChip(

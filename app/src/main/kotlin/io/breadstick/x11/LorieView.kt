@@ -166,14 +166,8 @@ open class LorieView @JvmOverloads constructor(
 
     private fun applyScreenSize() {
         if (surfaceW <= 0 || surfaceH <= 0) return
-        var targetW = surfaceW
-        var targetH = surfaceH
-
-        val largest = largestDisplay()
-        if (largest != null) {
-            targetW = maxOf(targetW, largest[0])
-            targetH = maxOf(targetH, largest[1])
-        }
+        val targetW = surfaceW
+        val targetH = surfaceH
 
         try {
             sendWindowChange(targetW, targetH, 60, OUTPUT_NAME)
