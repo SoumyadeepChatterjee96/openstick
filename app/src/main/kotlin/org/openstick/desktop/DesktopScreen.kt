@@ -1,10 +1,15 @@
 package org.openstick.desktop
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.net.Uri
 import android.view.InputDevice
 import android.view.MotionEvent
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -95,6 +100,39 @@ fun DesktopScreen(
     var isTrackpadMode by remember { mutableStateOf(false) }
     var showQuickMenu by remember { mutableStateOf(false) }
     var showScreenShareDialog by remember { mutableStateOf(false) }
+
+    val activity = context as? Activity
+    var isImmersiveEnabled by remember { mutableStateOf(true) }
+    var isLandscape by remember { mutableStateOf(false) }
+
+    // Immersive Mode: remove Android status bar from top for clean navigation
+    DisposableEffect(activity, isImmersiveEnabled) {
+        val window = activity?.window
+        if (window != null && isImmersiveEnabled) {
+            val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+            insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            insetsController.hide(WindowInsetsCompat.Type.statusBars())
+        }
+        onDispose {
+            val window = activity?.window
+            if (window != null) {
+                val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+                insetsController.show(WindowInsetsCompat.Type.statusBars())
+            }
+        }
+    }
+
+    // Orientation: horizontal landscape vs vertical portrait
+    DisposableEffect(isLandscape) {
+        if (isLandscape) {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } else {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+        onDispose {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
 
     // Auto-boot graphical desktop session on screen entry
     LaunchedEffect(Unit) {
@@ -654,6 +692,18 @@ fun DesktopScreen(
 
                             VerticalDivider(modifier = Modifier.height(18.dp).padding(horizontal = 2.dp), color = AmoledContainerHigh)
 
+                            // Horizontal Landscape / Vertical Portrait orientation toggle
+                            DesktopKeyChip(if (isLandscape) "⤾ Portrait" else "⤿ Landscape", active = isLandscape) {
+                                isLandscape = !isLandscape
+                            }
+
+                            // Fullscreen Immersive toggle (removes Android status bar)
+                            DesktopKeyChip(if (isImmersiveEnabled) "Fullscreen" else "Windowed", active = isImmersiveEnabled) {
+                                isImmersiveEnabled = !isImmersiveEnabled
+                            }
+
+                            VerticalDivider(modifier = Modifier.height(18.dp).padding(horizontal = 2.dp), color = AmoledContainerHigh)
+
                             // Screen Sharing / WebVNC
                             IconButton(
                                 onClick = { showScreenShareDialog = true },
@@ -879,6 +929,30 @@ fun DesktopScreen(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = Color(0xFF00FF66)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Screen Orientation:", fontSize = 11.sp, color = Color.White)
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            FilterChip(
+                                selected = !isLandscape,
+                                onClick = { isLandscape = false },
+                                label = { Text("Portrait", fontSize = 10.sp) },
+                                modifier = Modifier.height(28.dp)
+                            )
+                            FilterChip(
+                                selected = isLandscape,
+                                onClick = { isLandscape = true },
+                                label = { Text("Landscape", fontSize = 10.sp) },
+                                modifier = Modifier.height(28.dp)
                             )
                         }
                     }

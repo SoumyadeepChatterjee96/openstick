@@ -227,10 +227,12 @@ fun HomeScreen(
         return
     }
 
+    val palette = LocalOpenStickPalette.current
+
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(AmoledBackground)
+            .background(palette.background)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
@@ -342,9 +344,9 @@ fun HomeScreen(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = AmoledGlassContainer),
+            colors = CardDefaults.cardColors(containerColor = palette.glassContainer),
             shape = RoundedCornerShape(18.dp),
-            border = BorderStroke(1.dp, AmoledGlassBorder)
+            border = BorderStroke(1.dp, palette.glassBorder)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Row(
@@ -377,7 +379,7 @@ fun HomeScreen(
                                 text = "Device Access",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = palette.text
                             )
                             Text(
                                 text = "$activeBridgesCount of 6 bridges active",
@@ -403,7 +405,7 @@ fun HomeScreen(
 
                 if (isDeviceAccessExpanded) {
                     Spacer(modifier = Modifier.height(12.dp))
-                    HorizontalDivider(color = AmoledBorder)
+                    HorizontalDivider(color = palette.border)
                     Spacer(modifier = Modifier.height(10.dp))
 
                     // Device files
@@ -434,7 +436,7 @@ fun HomeScreen(
                         }
                     }
                 )
-                HorizontalDivider(color = AmoledContainerHigh, modifier = Modifier.padding(vertical = 10.dp))
+                HorizontalDivider(color = palette.containerHigh, modifier = Modifier.padding(vertical = 10.dp))
 
                 // Microphone
                 val (micStatus, micState) = when {
@@ -460,7 +462,7 @@ fun HomeScreen(
                         }
                     }
                 )
-                HorizontalDivider(color = AmoledContainerHigh, modifier = Modifier.padding(vertical = 10.dp))
+                HorizontalDivider(color = palette.containerHigh, modifier = Modifier.padding(vertical = 10.dp))
 
                 // Camera
                 val (camStatus, camState) = when {
@@ -486,7 +488,7 @@ fun HomeScreen(
                         }
                     }
                 )
-                HorizontalDivider(color = AmoledContainerHigh, modifier = Modifier.padding(vertical = 10.dp))
+                HorizontalDivider(color = palette.containerHigh, modifier = Modifier.padding(vertical = 10.dp))
 
                 // Calendar
                 val (calStatus, calState) = when {
@@ -512,7 +514,7 @@ fun HomeScreen(
                         }
                     }
                 )
-                HorizontalDivider(color = AmoledContainerHigh, modifier = Modifier.padding(vertical = 10.dp))
+                HorizontalDivider(color = palette.containerHigh, modifier = Modifier.padding(vertical = 10.dp))
 
                 // Notifications
                 val (notifStatus, notifState) = when {
@@ -540,7 +542,7 @@ fun HomeScreen(
                         }
                     }
                 )
-                HorizontalDivider(color = AmoledContainerHigh, modifier = Modifier.padding(vertical = 10.dp))
+                HorizontalDivider(color = palette.containerHigh, modifier = Modifier.padding(vertical = 10.dp))
 
                 // Printing
                 val (printStatus, printState) = if (printingBridgeEnabled) {
@@ -579,8 +581,8 @@ fun HomeScreen(
         Card(
             onClick = onNavigateApps,
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = AmoledGlassContainer),
-            border = BorderStroke(1.dp, AmoledGlassBorder),
+            colors = CardDefaults.cardColors(containerColor = palette.glassContainer),
+            border = BorderStroke(1.dp, palette.glassBorder),
             shape = RoundedCornerShape(18.dp)
         ) {
             Row(
@@ -611,7 +613,7 @@ fun HomeScreen(
                         text = "App Catalogue",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White
+                        color = palette.text
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
@@ -635,8 +637,8 @@ fun HomeScreen(
         Card(
             onClick = onNavigateMonitor,
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = AmoledGlassContainer),
-            border = BorderStroke(1.dp, AmoledGlassBorder),
+            colors = CardDefaults.cardColors(containerColor = palette.glassContainer),
+            border = BorderStroke(1.dp, palette.glassBorder),
             shape = RoundedCornerShape(18.dp)
         ) {
             Row(
@@ -667,7 +669,7 @@ fun HomeScreen(
                         text = "Resource Monitor",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White
+                        color = palette.text
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
@@ -690,8 +692,8 @@ fun HomeScreen(
         // Environment Backup & Maintenance Section
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = AmoledGlassContainer),
-            border = BorderStroke(1.dp, AmoledGlassBorder),
+            colors = CardDefaults.cardColors(containerColor = palette.glassContainer),
+            border = BorderStroke(1.dp, palette.glassBorder),
             shape = RoundedCornerShape(18.dp)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
@@ -699,7 +701,7 @@ fun HomeScreen(
                     text = "System Backup & Maintenance",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = palette.text
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
@@ -803,13 +805,14 @@ private fun LaunchTile(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val palette = LocalOpenStickPalette.current
     Card(
         onClick = onClick,
         modifier = modifier.height(105.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else AmoledGlassContainer
+            containerColor = if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else palette.glassContainer
         ),
-        border = BorderStroke(1.dp, if (active) MaterialTheme.colorScheme.primary else AmoledGlassBorder),
+        border = BorderStroke(1.dp, if (active) MaterialTheme.colorScheme.primary else palette.glassBorder),
         shape = RoundedCornerShape(18.dp)
     ) {
         Column(
@@ -830,7 +833,7 @@ private fun LaunchTile(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White,
+                color = palette.text,
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(2.dp))
@@ -860,6 +863,7 @@ private fun DeviceAccessRow(
     state: BridgeState,
     onClick: () -> Unit
 ) {
+    val palette = LocalOpenStickPalette.current
     val (badgeBg, badgeText, iconTint) = when (state) {
         BridgeState.ACTIVE -> Triple(Color(0xFF1B5E20), Color(0xFF81C784), MaterialTheme.colorScheme.primary)
         BridgeState.DISABLED -> Triple(Color(0xFF222222), Color(0xFF9E9E9E), Color(0xFF757575))
@@ -881,7 +885,7 @@ private fun DeviceAccessRow(
         )
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = Color.White)
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = palette.text)
             Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
         }
         Spacer(modifier = Modifier.width(8.dp))

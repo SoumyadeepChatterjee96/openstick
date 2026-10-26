@@ -94,8 +94,14 @@ class WindowActivity : ComponentActivity() {
         val x11Server = app.x11Server
         val runner = app.runner
 
+        val prefs = getSharedPreferences("openstick_prefs", MODE_PRIVATE)
+        val initialThemeOrdinal = prefs.getInt("theme_mode", org.openstick.ui.theme.AppThemeMode.AMOLED_BLACK.ordinal)
+        val initialTheme = org.openstick.ui.theme.AppThemeMode.values().getOrElse(initialThemeOrdinal) { org.openstick.ui.theme.AppThemeMode.AMOLED_BLACK }
+        val initialAccentKey = prefs.getString("accent_color", org.openstick.ui.theme.AppAccent.CYAN.name) ?: org.openstick.ui.theme.AppAccent.CYAN.name
+        val initialAccent = try { org.openstick.ui.theme.AppAccent.valueOf(initialAccentKey) } catch (_: Exception) { org.openstick.ui.theme.AppAccent.CYAN }
+
         setContent {
-            OpenStickTheme {
+            OpenStickTheme(themeMode = initialTheme, accent = initialAccent) {
                 WindowContent(
                     mode = mode,
                     title = initialTitle,
@@ -157,17 +163,19 @@ fun WindowContent(
         }
     }
 
+    val palette = org.openstick.ui.theme.LocalOpenStickPalette.current
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(AmoledBackground)
+            .background(palette.background)
             .imePadding()
     ) {
         // Native Window Header Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(AmoledContainer)
+                .background(palette.container)
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -319,7 +327,10 @@ fun WindowContent(
                 WindowActivity.MODE_MONITOR -> {
                     val context = androidx.compose.ui.platform.LocalContext.current
                     val monitor = remember { org.openstick.engine.ResourceMonitor(context) }
-                    org.openstick.monitor.MonitorScreen(monitor = monitor)
+                    org.openstick.monitor.DetailedFloatingMonitorView(
+                        monitor = monitor,
+                        onClose = onClose
+                    )
                 }
                 else -> {
                     // DESKTOP & APP mode: Native LorieView Surface

@@ -20,7 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
@@ -64,6 +66,8 @@ class MainActivity : ComponentActivity() {
         val initialTheme = AppThemeMode.values().getOrElse(initialThemeOrdinal) { AppThemeMode.AMOLED_BLACK }
         val initialAccentKey = prefs.getString("accent_color", AppAccent.CYAN.name) ?: AppAccent.CYAN.name
         val initialAccent = try { AppAccent.valueOf(initialAccentKey) } catch (_: Exception) { AppAccent.CYAN }
+        val initialUiScaleOrdinal = prefs.getInt("ui_scale", UiScale.STANDARD.ordinal)
+        val initialUiScale = UiScale.values().getOrElse(initialUiScaleOrdinal) { UiScale.STANDARD }
 
         // Restore user-enabled bridges (strictly false by default)
         HardwareBridges.cameraBridgeEnabled = prefs.getBoolean("bridge_camera", false)
@@ -87,6 +91,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             var currentTheme by remember { mutableStateOf(initialTheme) }
             var currentAccent by remember { mutableStateOf(initialAccent) }
+            var currentUiScale by remember { mutableStateOf(initialUiScale) }
             var currentScreen by remember { mutableStateOf(Screen.HOME) }
             var isNavMenuOpen by remember { mutableStateOf(false) }
 
@@ -102,68 +107,82 @@ class MainActivity : ComponentActivity() {
             }
 
             OpenStickTheme(themeMode = currentTheme, accent = currentAccent) {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    containerColor = AmoledBackground,
-                    bottomBar = {} // 100% free vertical screen real estate!
-                ) { _ ->
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        // 1. Screen Content
-                        val contentModifier = if (currentScreen == Screen.TERMINAL || currentScreen == Screen.DESKTOP) {
-                            Modifier.fillMaxSize()
-                        } else {
-                            Modifier
-                                .fillMaxSize()
-                                .statusBarsPadding()
-                                .padding(top = 46.dp)
-                        }
+                val currentDensity = LocalDensity.current
+                CompositionLocalProvider(
+                    LocalDensity provides Density(
+                        density = currentDensity.density * currentUiScale.factor,
+                        fontScale = currentDensity.fontScale * currentUiScale.factor
+                    )
+                ) {
+                    val palette = LocalOpenStickPalette.current
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize(),
+                        containerColor = palette.background,
+                        contentColor = palette.text,
+                        bottomBar = {} // 100% free vertical screen real estate!
+                    ) { _ ->
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            // 1. Screen Content
+                            val contentModifier = if (currentScreen == Screen.TERMINAL || currentScreen == Screen.DESKTOP) {
+                                Modifier.fillMaxSize()
+                            } else {
+                                Modifier
+                                    .fillMaxSize()
+                                    .statusBarsPadding()
+                                    .padding(top = 46.dp)
+                            }
 
-                        when (currentScreen) {
-                            Screen.HOME -> HomeScreen(
-                                env = env,
-                                runner = mainRunner,
-                                onNavigateTerminal = { currentScreen = Screen.TERMINAL },
-                                onNavigateDesktop = { currentScreen = Screen.DESKTOP },
-                                onNavigateApps = { currentScreen = Screen.APPS },
-                                onNavigateMonitor = { currentScreen = Screen.MONITOR },
-                                modifier = contentModifier
-                            )
-                            Screen.APPS -> AppsScreen(
-                                env = env,
-                                runner = mainRunner,
-                                modifier = contentModifier
-                            )
-                            Screen.TERMINAL -> TerminalScreen(
-                                manager = terminalManager,
-                                modifier = contentModifier,
-                                onNavigateHome = { currentScreen = Screen.HOME }
-                            )
-                            Screen.DESKTOP -> DesktopScreen(
-                                env = env,
-                                x11Server = x11Server,
-                                runner = mainRunner,
-                                modifier = contentModifier
-                            )
-                            Screen.MONITOR -> MonitorScreen(
-                                monitor = resourceMonitor,
-                                modifier = contentModifier
-                            )
-                            Screen.SETTINGS -> SettingsScreen(
-                                env = env,
-                                runner = mainRunner,
-                                currentTheme = currentTheme,
-                                onThemeChange = { newTheme ->
-                                    currentTheme = newTheme
-                                    prefs.edit().putInt("theme_mode", newTheme.ordinal).apply()
-                                },
-                                currentAccent = currentAccent,
-                                onAccentChange = { newAccent ->
-                                    currentAccent = newAccent
-                                    prefs.edit().putString("accent_color", newAccent.name).apply()
-                                },
-                                modifier = contentModifier
-                            )
-                        }
+                            when (currentScreen) {
+                                Screen.HOME -> HomeScreen(
+                                    env = env,
+                                    runner = mainRunner,
+                                    onNavigateTerminal = { currentScreen = Screen.TERMINAL },
+                                    onNavigateDesktop = { currentScreen = Screen.DESKTOP },
+                                    onNavigateApps = { currentScreen = Screen.APPS },
+                                    onNavigateMonitor = { currentScreen = Screen.MONITOR },
+                                    modifier = contentModifier
+                                )
+                                Screen.APPS -> AppsScreen(
+                                    env = env,
+                                    runner = mainRunner,
+                                    modifier = contentModifier
+                                )
+                                Screen.TERMINAL -> TerminalScreen(
+                                    manager = terminalManager,
+                                    modifier = contentModifier,
+                                    onNavigateHome = { currentScreen = Screen.HOME }
+                                )
+                                Screen.DESKTOP -> DesktopScreen(
+                                    env = env,
+                                    x11Server = x11Server,
+                                    runner = mainRunner,
+                                    modifier = contentModifier
+                                )
+                                Screen.MONITOR -> MonitorScreen(
+                                    monitor = resourceMonitor,
+                                    modifier = contentModifier
+                                )
+                                Screen.SETTINGS -> SettingsScreen(
+                                    env = env,
+                                    runner = mainRunner,
+                                    currentTheme = currentTheme,
+                                    onThemeChange = { newTheme ->
+                                        currentTheme = newTheme
+                                        prefs.edit().putInt("theme_mode", newTheme.ordinal).apply()
+                                    },
+                                    currentAccent = currentAccent,
+                                    onAccentChange = { newAccent ->
+                                        currentAccent = newAccent
+                                        prefs.edit().putString("accent_color", newAccent.name).apply()
+                                    },
+                                    currentUiScale = currentUiScale,
+                                    onUiScaleChange = { newScale ->
+                                        currentUiScale = newScale
+                                        prefs.edit().putInt("ui_scale", newScale.ordinal).apply()
+                                    },
+                                    modifier = contentModifier
+                                )
+                            }
 
                         // 2. Floating Navigation Controls
                         if (currentScreen == Screen.DESKTOP || currentScreen == Screen.TERMINAL) {
@@ -171,8 +190,8 @@ class MainActivity : ComponentActivity() {
                             Surface(
                                 onClick = { isNavMenuOpen = !isNavMenuOpen },
                                 shape = CircleShape,
-                                color = AmoledGlassContainer,
-                                border = BorderStroke(1.dp, AmoledGlassBorder),
+                                color = palette.glassContainer,
+                                border = BorderStroke(1.dp, palette.glassBorder),
                                 shadowElevation = 8.dp,
                                 modifier = Modifier
                                     .statusBarsPadding()
@@ -193,8 +212,8 @@ class MainActivity : ComponentActivity() {
                             // Normal mode: Sleek floating glass navigation pill across top
                             Surface(
                                 shape = RoundedCornerShape(22.dp),
-                                color = AmoledGlassContainer,
-                                border = BorderStroke(1.dp, AmoledGlassBorder),
+                                color = palette.glassContainer,
+                                border = BorderStroke(1.dp, palette.glassBorder),
                                 shadowElevation = 8.dp,
                                 modifier = Modifier
                                     .statusBarsPadding()
@@ -226,12 +245,12 @@ class MainActivity : ComponentActivity() {
                                             text = "OpenStick",
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color.White
+                                            color = palette.text
                                         )
                                         Text(
                                             text = " › ",
                                             fontSize = 12.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = palette.textDim
                                         )
                                         Text(
                                             text = currentScreen.title,
@@ -253,7 +272,7 @@ class MainActivity : ComponentActivity() {
                                             Icon(
                                                 Icons.Default.Home,
                                                 contentDescription = "Home",
-                                                tint = if (currentScreen == Screen.HOME) MaterialTheme.colorScheme.primary else Color.LightGray,
+                                                tint = if (currentScreen == Screen.HOME) MaterialTheme.colorScheme.primary else palette.textDim,
                                                 modifier = Modifier.size(16.dp)
                                             )
                                         }
@@ -264,7 +283,7 @@ class MainActivity : ComponentActivity() {
                                             Icon(
                                                 Icons.Default.Apps,
                                                 contentDescription = "Apps",
-                                                tint = if (currentScreen == Screen.APPS) MaterialTheme.colorScheme.primary else Color.LightGray,
+                                                tint = if (currentScreen == Screen.APPS) MaterialTheme.colorScheme.primary else palette.textDim,
                                                 modifier = Modifier.size(16.dp)
                                             )
                                         }
@@ -275,7 +294,7 @@ class MainActivity : ComponentActivity() {
                                             Icon(
                                                 Icons.Default.Terminal,
                                                 contentDescription = "Terminal",
-                                                tint = if (currentScreen == Screen.TERMINAL) MaterialTheme.colorScheme.primary else Color.LightGray,
+                                                tint = if (currentScreen == Screen.TERMINAL) MaterialTheme.colorScheme.primary else palette.textDim,
                                                 modifier = Modifier.size(16.dp)
                                             )
                                         }
@@ -286,7 +305,7 @@ class MainActivity : ComponentActivity() {
                                             Icon(
                                                 Icons.Default.DesktopWindows,
                                                 contentDescription = "Desktop",
-                                                tint = if (currentScreen == Screen.DESKTOP) MaterialTheme.colorScheme.primary else Color.LightGray,
+                                                tint = if (currentScreen == Screen.DESKTOP) MaterialTheme.colorScheme.primary else palette.textDim,
                                                 modifier = Modifier.size(16.dp)
                                             )
                                         }
@@ -305,7 +324,7 @@ class MainActivity : ComponentActivity() {
                             ) {
                                 Card(
                                     shape = RoundedCornerShape(24.dp),
-                                    colors = CardDefaults.cardColors(containerColor = AmoledGlassHigh),
+                                    colors = CardDefaults.cardColors(containerColor = palette.glassHigh),
                                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
                                     modifier = Modifier
                                         .statusBarsPadding()
@@ -336,7 +355,7 @@ class MainActivity : ComponentActivity() {
                                                     text = "OpenStick Navigation",
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 15.sp,
-                                                    color = Color.White
+                                                    color = palette.text
                                                 )
                                             }
 
@@ -347,7 +366,7 @@ class MainActivity : ComponentActivity() {
                                                 Icon(
                                                     Icons.Default.Close,
                                                     contentDescription = "Close Menu",
-                                                    tint = Color.LightGray,
+                                                    tint = palette.textDim,
                                                     modifier = Modifier.size(18.dp)
                                                 )
                                             }
@@ -364,10 +383,10 @@ class MainActivity : ComponentActivity() {
                                                     isNavMenuOpen = false
                                                 },
                                                 shape = RoundedCornerShape(16.dp),
-                                                color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else AmoledGlassContainer,
+                                                color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else palette.glassContainer,
                                                 border = BorderStroke(
                                                     1.dp,
-                                                    if (isSelected) MaterialTheme.colorScheme.primary else AmoledGlassBorder
+                                                    if (isSelected) MaterialTheme.colorScheme.primary else palette.glassBorder
                                                 ),
                                                 modifier = Modifier
                                                     .fillMaxWidth()
@@ -382,7 +401,7 @@ class MainActivity : ComponentActivity() {
                                                             .size(36.dp)
                                                             .clip(RoundedCornerShape(10.dp))
                                                             .background(
-                                                                if (isSelected) MaterialTheme.colorScheme.primary else AmoledGlassHigh
+                                                                if (isSelected) MaterialTheme.colorScheme.primary else palette.glassHigh
                                                             ),
                                                         contentAlignment = Alignment.Center
                                                     ) {
@@ -401,12 +420,12 @@ class MainActivity : ComponentActivity() {
                                                             text = screen.title,
                                                             fontWeight = FontWeight.Bold,
                                                             fontSize = 14.sp,
-                                                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White
+                                                            color = if (isSelected) MaterialTheme.colorScheme.primary else palette.text
                                                         )
                                                         Text(
                                                             text = screen.subtitle,
                                                             fontSize = 11.sp,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            color = palette.textDim
                                                         )
                                                     }
 
@@ -458,4 +477,5 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+}
 }

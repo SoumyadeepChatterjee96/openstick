@@ -27,11 +27,7 @@ import kotlinx.coroutines.isActive
 import org.openstick.engine.ProcessInfo
 import org.openstick.engine.ResourceMonitor
 import org.openstick.engine.SystemStats
-import org.openstick.ui.theme.AmoledBackground
-import org.openstick.ui.theme.AmoledContainer
-import org.openstick.ui.theme.AmoledContainerHigh
-import org.openstick.ui.theme.AmoledGlassBorder
-import org.openstick.ui.theme.AmoledGlassContainer
+import org.openstick.ui.theme.LocalOpenStickPalette
 
 @Composable
 fun MonitorScreen(
@@ -55,10 +51,12 @@ fun MonitorScreen(
         }
     }
 
+    val palette = LocalOpenStickPalette.current
+
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(AmoledBackground)
+            .background(palette.background)
             .padding(16.dp)
     ) {
         // Compact Header
@@ -102,8 +100,8 @@ fun MonitorScreen(
                     )
                 },
                 shape = RoundedCornerShape(12.dp),
-                color = AmoledGlassContainer,
-                border = BorderStroke(1.dp, AmoledGlassBorder),
+                color = palette.glassContainer,
+                border = BorderStroke(1.dp, palette.glassBorder),
                 modifier = Modifier.height(30.dp)
             ) {
                 Row(
@@ -117,7 +115,7 @@ fun MonitorScreen(
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(14.dp)
                     )
-                    Text("Pop-up", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text("Pop-up", fontSize = 11.sp, color = palette.text, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -164,8 +162,8 @@ fun MonitorScreen(
 
                 Card(
                     modifier = Modifier.weight(1f),
-                    colors = CardDefaults.cardColors(containerColor = AmoledGlassContainer),
-                    border = BorderStroke(1.dp, AmoledGlassBorder),
+                    colors = CardDefaults.cardColors(containerColor = palette.glassContainer),
+                    border = BorderStroke(1.dp, palette.glassBorder),
                     shape = RoundedCornerShape(18.dp)
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
@@ -187,8 +185,8 @@ fun MonitorScreen(
 
                 Card(
                     modifier = Modifier.weight(1f),
-                    colors = CardDefaults.cardColors(containerColor = AmoledGlassContainer),
-                    border = BorderStroke(1.dp, AmoledGlassBorder),
+                    colors = CardDefaults.cardColors(containerColor = palette.glassContainer),
+                    border = BorderStroke(1.dp, palette.glassBorder),
                     shape = RoundedCornerShape(18.dp)
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
@@ -240,9 +238,9 @@ fun MonitorScreen(
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = AmoledGlassBorder,
-                        focusedContainerColor = AmoledGlassContainer,
-                        unfocusedContainerColor = AmoledGlassContainer
+                        unfocusedBorderColor = palette.glassBorder,
+                        focusedContainerColor = palette.glassContainer,
+                        unfocusedContainerColor = palette.glassContainer
                     ),
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) }
                 )
@@ -259,8 +257,8 @@ fun MonitorScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                colors = CardDefaults.cardColors(containerColor = AmoledGlassContainer),
-                border = BorderStroke(1.dp, AmoledGlassBorder),
+                colors = CardDefaults.cardColors(containerColor = palette.glassContainer),
+                border = BorderStroke(1.dp, palette.glassBorder),
                 shape = RoundedCornerShape(18.dp)
             ) {
                 if (filteredProcs.isEmpty()) {
@@ -280,7 +278,7 @@ fun MonitorScreen(
                                     statusFeedback = if (ok) "Sent SIGKILL to PID ${proc.pid} (${proc.name})" else "Failed to kill PID ${proc.pid}"
                                 }
                             )
-                            HorizontalDivider(color = AmoledContainerHigh, thickness = 0.5.dp)
+                            HorizontalDivider(color = palette.containerHigh, thickness = 0.5.dp)
                         }
                     }
                 }
@@ -302,10 +300,11 @@ private fun MetricCard(
     history: List<Float>,
     modifier: Modifier = Modifier
 ) {
+    val palette = LocalOpenStickPalette.current
     Card(
         modifier = modifier.height(120.dp),
-        colors = CardDefaults.cardColors(containerColor = AmoledGlassContainer),
-        border = BorderStroke(1.dp, AmoledGlassBorder),
+        colors = CardDefaults.cardColors(containerColor = palette.glassContainer),
+        border = BorderStroke(1.dp, palette.glassBorder),
         shape = RoundedCornerShape(18.dp)
     ) {
         Column(
@@ -315,7 +314,7 @@ private fun MetricCard(
         ) {
             Text(title, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(2.dp))
-            Text(value, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(value, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = palette.text)
             Text(subtext, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             Spacer(modifier = Modifier.weight(1f))
@@ -353,6 +352,7 @@ private fun ProcessRow(
     proc: ProcessInfo,
     onKill: () -> Unit
 ) {
+    val palette = LocalOpenStickPalette.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -366,7 +366,7 @@ private fun ProcessRow(
                     text = proc.name,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
-                    color = Color.White
+                    color = palette.text
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(

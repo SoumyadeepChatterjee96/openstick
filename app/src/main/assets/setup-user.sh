@@ -69,8 +69,14 @@ BRC="/home/$U/.bashrc"
 if [ -f "$BRC" ] && ! grep -q 'openstick-fetch' "$BRC" 2>/dev/null; then
     cat >> "$BRC" <<'BRCEOF'
 
-# OpenStick greeting. Delete these two lines if you would rather have a quiet shell.
-case $- in *i*) [ -x /usr/bin/openstick-fetch ] && openstick-fetch ;; esac
+# OpenStick greeting. Delete these lines if you would rather have a quiet shell.
+case $- in *i*)
+    if [ -z "$OPENSTICK_MOTD_SHOWN" ] && [ -x /usr/bin/openstick-fetch ]; then
+        export OPENSTICK_MOTD_SHOWN=1
+        openstick-fetch
+    fi
+    ;;
+esac
 BRCEOF
     chown "$U:$U" "$BRC" 2>/dev/null || true
 fi
@@ -79,8 +85,14 @@ fi
 if [ -f /etc/skel/.bashrc ] && ! grep -q 'openstick-fetch' /etc/skel/.bashrc 2>/dev/null; then
     cat >> /etc/skel/.bashrc <<'BRCEOF'
 
-# OpenStick greeting. Delete these two lines if you would rather have a quiet shell.
-case $- in *i*) [ -x /usr/bin/openstick-fetch ] && openstick-fetch ;; esac
+# OpenStick greeting. Delete these lines if you would rather have a quiet shell.
+case $- in *i*)
+    if [ -z "$OPENSTICK_MOTD_SHOWN" ] && [ -x /usr/bin/openstick-fetch ]; then
+        export OPENSTICK_MOTD_SHOWN=1
+        openstick-fetch
+    fi
+    ;;
+esac
 BRCEOF
 fi
 

@@ -7,20 +7,36 @@ data class LinuxApp(
     val description: String,
     val aptPackage: String,
     val iconName: String,
+    val isService: Boolean = false,
+    val servicePort: Int? = null,
+    val webUrl: String? = null,
     val customInstallCmd: String? = null,
-    val customLaunchCmd: String? = null
+    val customLaunchCmd: String? = null,
+    val startServiceCmd: String? = null,
+    val stopServiceCmd: String? = null,
+    val checkRunningCmd: String? = null,
+    val customUpdateCmd: String? = null,
+    val customRemoveCmd: String? = null
 )
 
 object AppCatalogue {
     val apps = listOf(
+        // Services & Self-Hosted Developer Stacks
         LinuxApp(
             id = "docker",
             name = "Docker & Podman",
             category = "Development",
-            description = "Rootless container engine, Docker CLI, and docker-compose tools",
+            description = "Rootless container engine, Docker CLI, and podman-compose tools",
             aptPackage = "podman podman-compose docker.io",
             iconName = "terminal",
-            customLaunchCmd = "xterm -e 'echo OpenStick Container CLI; podman --version 2>/dev/null; docker --version 2>/dev/null; bash'"
+            isService = true,
+            servicePort = 8888,
+            startServiceCmd = "nohup podman system service --time=0 tcp:127.0.0.1:8888 >/tmp/podman.log 2>&1 &",
+            stopServiceCmd = "pkill -f 'podman system service'",
+            checkRunningCmd = "pgrep -f 'podman system service'",
+            customLaunchCmd = "xterm -e 'echo OpenStick Container CLI; podman --version 2>/dev/null; docker --version 2>/dev/null; bash'",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y podman podman-compose docker.io",
+            customRemoveCmd = "apt-get purge -y podman podman-compose docker.io && apt-get autoremove -y"
         ),
         LinuxApp(
             id = "n8n",
@@ -29,8 +45,16 @@ object AppCatalogue {
             description = "Self-hosted fair-code workflow automation tool with 400+ integration nodes",
             aptPackage = "nodejs npm python3 build-essential",
             iconName = "code",
+            isService = true,
+            servicePort = 5678,
+            webUrl = "http://localhost:5678",
             customInstallCmd = "export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y --no-install-recommends nodejs npm python3 build-essential && npm install -g --unsafe-perm n8n",
-            customLaunchCmd = "xterm -e 'echo Starting n8n server on localhost:5678...; n8n start'"
+            startServiceCmd = "nohup n8n start >/tmp/n8n.log 2>&1 &",
+            stopServiceCmd = "pkill -f 'n8n start' || pkill -f 'node /usr/local/bin/n8n'",
+            checkRunningCmd = "pgrep -f 'n8n start' || pgrep -f 'node /usr/local/bin/n8n'",
+            customLaunchCmd = "xterm -e 'echo Starting n8n server on localhost:5678...; n8n start'",
+            customUpdateCmd = "npm update -g n8n",
+            customRemoveCmd = "npm uninstall -g n8n"
         ),
         LinuxApp(
             id = "nodered",
@@ -39,16 +63,130 @@ object AppCatalogue {
             description = "Low-code visual event-driven flow programming for IoT and APIs",
             aptPackage = "nodejs npm build-essential",
             iconName = "code",
+            isService = true,
+            servicePort = 1880,
+            webUrl = "http://localhost:1880",
             customInstallCmd = "export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y --no-install-recommends nodejs npm build-essential && npm install -g --unsafe-perm node-red",
-            customLaunchCmd = "xterm -e 'echo Starting Node-RED on localhost:1880...; node-red'"
+            startServiceCmd = "nohup node-red >/tmp/nodered.log 2>&1 &",
+            stopServiceCmd = "pkill -f node-red",
+            checkRunningCmd = "pgrep -f node-red",
+            customLaunchCmd = "xterm -e 'echo Starting Node-RED on localhost:1880...; node-red'",
+            customUpdateCmd = "npm update -g node-red",
+            customRemoveCmd = "npm uninstall -g node-red"
         ),
+        LinuxApp(
+            id = "codeserver",
+            name = "VS Code Server",
+            category = "Development",
+            description = "Run full VS Code in your browser from any local network device",
+            aptPackage = "curl wget",
+            iconName = "code",
+            isService = true,
+            servicePort = 8080,
+            webUrl = "http://localhost:8080",
+            customInstallCmd = "curl -fsSL https://code-server.dev/install.sh | sh",
+            startServiceCmd = "nohup code-server --auth none --bind-addr 0.0.0.0:8080 >/tmp/code-server.log 2>&1 &",
+            stopServiceCmd = "pkill -f code-server",
+            checkRunningCmd = "pgrep -f code-server",
+            customLaunchCmd = "xterm -e 'echo Starting VS Code Server on port 8080...; code-server --auth none --bind-addr 0.0.0.0:8080'",
+            customUpdateCmd = "curl -fsSL https://code-server.dev/install.sh | sh",
+            customRemoveCmd = "apt-get purge -y code-server 2>/dev/null || rm -rf ~/.local/lib/code-server* /usr/bin/code-server"
+        ),
+        LinuxApp(
+            id = "ollama",
+            name = "Ollama Local LLM",
+            category = "Development",
+            description = "Get up and running with Llama 3, Mistral, and Gemma models locally on ARM64",
+            aptPackage = "curl",
+            iconName = "terminal",
+            isService = true,
+            servicePort = 11434,
+            webUrl = "http://localhost:11434",
+            customInstallCmd = "curl -fsSL https://ollama.com/install.sh | sh",
+            startServiceCmd = "nohup ollama serve >/tmp/ollama.log 2>&1 &",
+            stopServiceCmd = "pkill -f 'ollama serve'",
+            checkRunningCmd = "pgrep -f 'ollama serve'",
+            customLaunchCmd = "xterm -e 'echo Starting Ollama AI Server...; ollama serve'",
+            customUpdateCmd = "curl -fsSL https://ollama.com/install.sh | sh",
+            customRemoveCmd = "pkill -f 'ollama serve' && rm -f /usr/local/bin/ollama"
+        ),
+        LinuxApp(
+            id = "jellyfin",
+            name = "Jellyfin Media Server",
+            category = "Media",
+            description = "Free Software media system that lets you control your media streaming",
+            aptPackage = "jellyfin",
+            iconName = "media",
+            isService = true,
+            servicePort = 8096,
+            webUrl = "http://localhost:8096",
+            startServiceCmd = "nohup jellyfin --datadir ~/.local/share/jellyfin --cachedir ~/.cache/jellyfin >/tmp/jellyfin.log 2>&1 &",
+            stopServiceCmd = "pkill -f jellyfin",
+            checkRunningCmd = "pgrep -f jellyfin",
+            customLaunchCmd = "xterm -e 'echo Starting Jellyfin Server on localhost:8096...; jellyfin'",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y jellyfin",
+            customRemoveCmd = "apt-get purge -y jellyfin && apt-get autoremove -y"
+        ),
+        LinuxApp(
+            id = "postgres",
+            name = "PostgreSQL Database",
+            category = "Development",
+            description = "World's most advanced open source relational database server",
+            aptPackage = "postgresql postgresql-contrib",
+            iconName = "code",
+            isService = true,
+            servicePort = 5432,
+            startServiceCmd = "su - postgres -c '/usr/lib/postgresql/*/bin/pg_ctl -D /var/lib/postgresql/*/main start' 2>/dev/null || service postgresql start",
+            stopServiceCmd = "su - postgres -c '/usr/lib/postgresql/*/bin/pg_ctl -D /var/lib/postgresql/*/main stop' 2>/dev/null || service postgresql stop",
+            checkRunningCmd = "pgrep -f postgres",
+            customLaunchCmd = "xterm -e 'su - postgres -c psql'",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y postgresql postgresql-contrib",
+            customRemoveCmd = "apt-get purge -y postgresql postgresql-contrib && apt-get autoremove -y"
+        ),
+        LinuxApp(
+            id = "redis",
+            name = "Redis In-Memory Store",
+            category = "Development",
+            description = "In-memory database, cache, message broker, and streaming engine",
+            aptPackage = "redis-server",
+            iconName = "code",
+            isService = true,
+            servicePort = 6379,
+            startServiceCmd = "nohup redis-server >/tmp/redis.log 2>&1 &",
+            stopServiceCmd = "pkill -f redis-server",
+            checkRunningCmd = "pgrep -f redis-server",
+            customLaunchCmd = "xterm -e 'redis-cli'",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y redis-server",
+            customRemoveCmd = "apt-get purge -y redis-server && apt-get autoremove -y"
+        ),
+        LinuxApp(
+            id = "transmission",
+            name = "Transmission Web Torrent",
+            category = "Utilities",
+            description = "Fast, easy, and lightweight BitTorrent client with built-in web interface",
+            aptPackage = "transmission-daemon",
+            iconName = "network",
+            isService = true,
+            servicePort = 9091,
+            webUrl = "http://localhost:9091",
+            startServiceCmd = "nohup transmission-daemon -f >/tmp/transmission.log 2>&1 &",
+            stopServiceCmd = "pkill -f transmission-daemon",
+            checkRunningCmd = "pgrep -f transmission-daemon",
+            customLaunchCmd = "xterm -e 'transmission-daemon -f'",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y transmission-daemon",
+            customRemoveCmd = "apt-get purge -y transmission-daemon && apt-get autoremove -y"
+        ),
+
+        // Desktop GUI Applications
         LinuxApp(
             id = "chromium",
             name = "Chromium",
             category = "Web Browsers",
             description = "Fast, open-source web browser with desktop extensions support",
             aptPackage = "chromium",
-            iconName = "browser"
+            iconName = "browser",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y chromium",
+            customRemoveCmd = "apt-get purge -y chromium && apt-get autoremove -y"
         ),
         LinuxApp(
             id = "firefox",
@@ -56,15 +194,30 @@ object AppCatalogue {
             category = "Web Browsers",
             description = "Privacy-focused desktop web browser with full devtools",
             aptPackage = "firefox-esr",
-            iconName = "browser"
+            iconName = "browser",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y firefox-esr",
+            customRemoveCmd = "apt-get purge -y firefox-esr && apt-get autoremove -y"
         ),
         LinuxApp(
-            id = "vscode",
+            id = "vscode_oss",
             name = "VS Code (Code-OSS)",
             category = "Development",
             description = "Full featured code editor with extensions, Git, and terminal",
             aptPackage = "code-oss",
-            iconName = "code"
+            iconName = "code",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y code-oss",
+            customRemoveCmd = "apt-get purge -y code-oss && apt-get autoremove -y"
+        ),
+        LinuxApp(
+            id = "rust",
+            name = "Rust & Cargo Toolchain",
+            category = "Development",
+            description = "Modern safe systems programming language compiler and package manager",
+            aptPackage = "rustc cargo",
+            iconName = "terminal",
+            customLaunchCmd = "xterm -e 'echo OpenStick Rust Compiler Toolchain; rustc --version; cargo --version; bash'",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y rustc cargo",
+            customRemoveCmd = "apt-get purge -y rustc cargo && apt-get autoremove -y"
         ),
         LinuxApp(
             id = "build_essential",
@@ -72,7 +225,9 @@ object AppCatalogue {
             category = "Development",
             description = "GCC, G++, Make, and standard C library headers for compilation",
             aptPackage = "build-essential gdb cmake",
-            iconName = "terminal"
+            iconName = "terminal",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y build-essential gdb cmake",
+            customRemoveCmd = "apt-get purge -y build-essential gdb cmake && apt-get autoremove -y"
         ),
         LinuxApp(
             id = "python",
@@ -80,15 +235,19 @@ object AppCatalogue {
             category = "Development",
             description = "Python 3 interpreter, pip package manager, and virtualenv",
             aptPackage = "python3 python3-pip python3-venv",
-            iconName = "code"
+            iconName = "code",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y python3 python3-pip python3-venv",
+            customRemoveCmd = "apt-get purge -y python3 python3-pip python3-venv && apt-get autoremove -y"
         ),
         LinuxApp(
-            id = "nodejs",
+            id = "nodejs_dev",
             name = "Node.js & NPM",
             category = "Development",
             description = "JavaScript runtime and Node package manager",
             aptPackage = "nodejs npm",
-            iconName = "code"
+            iconName = "code",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y nodejs npm",
+            customRemoveCmd = "apt-get purge -y nodejs npm && apt-get autoremove -y"
         ),
         LinuxApp(
             id = "git",
@@ -96,7 +255,9 @@ object AppCatalogue {
             category = "Development",
             description = "Distributed version control system",
             aptPackage = "git",
-            iconName = "code"
+            iconName = "code",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y git",
+            customRemoveCmd = "apt-get purge -y git && apt-get autoremove -y"
         ),
         LinuxApp(
             id = "libreoffice",
@@ -104,7 +265,9 @@ object AppCatalogue {
             category = "Office",
             description = "Complete office productivity suite (Writer, Calc, Impress)",
             aptPackage = "libreoffice",
-            iconName = "document"
+            iconName = "document",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y libreoffice",
+            customRemoveCmd = "apt-get purge -y libreoffice && apt-get autoremove -y"
         ),
         LinuxApp(
             id = "gimp",
@@ -112,7 +275,9 @@ object AppCatalogue {
             category = "Graphics",
             description = "Professional image manipulation and photo editing suite",
             aptPackage = "gimp",
-            iconName = "image"
+            iconName = "image",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y gimp",
+            customRemoveCmd = "apt-get purge -y gimp && apt-get autoremove -y"
         ),
         LinuxApp(
             id = "inkscape",
@@ -120,7 +285,9 @@ object AppCatalogue {
             category = "Graphics",
             description = "Professional vector graphics editor for SVG design",
             aptPackage = "inkscape",
-            iconName = "image"
+            iconName = "image",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y inkscape",
+            customRemoveCmd = "apt-get purge -y inkscape && apt-get autoremove -y"
         ),
         LinuxApp(
             id = "vlc",
@@ -128,7 +295,9 @@ object AppCatalogue {
             category = "Media",
             description = "Versatile media player supporting virtually all audio and video formats",
             aptPackage = "vlc",
-            iconName = "media"
+            iconName = "media",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y vlc",
+            customRemoveCmd = "apt-get purge -y vlc && apt-get autoremove -y"
         ),
         LinuxApp(
             id = "htop",
@@ -136,7 +305,9 @@ object AppCatalogue {
             category = "Utilities",
             description = "Interactive process viewer and system resource monitor",
             aptPackage = "htop",
-            iconName = "monitor"
+            iconName = "monitor",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y htop",
+            customRemoveCmd = "apt-get purge -y htop && apt-get autoremove -y"
         ),
         LinuxApp(
             id = "neofetch",
@@ -144,7 +315,9 @@ object AppCatalogue {
             category = "Utilities",
             description = "Command-line system information tool",
             aptPackage = "neofetch fastfetch",
-            iconName = "terminal"
+            iconName = "terminal",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y neofetch fastfetch",
+            customRemoveCmd = "apt-get purge -y neofetch fastfetch && apt-get autoremove -y"
         ),
         LinuxApp(
             id = "tmux",
@@ -152,7 +325,9 @@ object AppCatalogue {
             category = "Utilities",
             description = "Terminal multiplexer with split panes and background sessions",
             aptPackage = "tmux",
-            iconName = "terminal"
+            iconName = "terminal",
+            customUpdateCmd = "apt-get update && apt-get --only-upgrade install -y tmux",
+            customRemoveCmd = "apt-get purge -y tmux && apt-get autoremove -y"
         )
     )
 }

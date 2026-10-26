@@ -56,11 +56,14 @@ fun SettingsScreen(
     onThemeChange: (AppThemeMode) -> Unit,
     currentAccent: AppAccent = AppAccent.CYAN,
     onAccentChange: (AppAccent) -> Unit = {},
+    currentUiScale: UiScale = UiScale.STANDARD,
+    onUiScaleChange: (UiScale) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val prefs = remember { context.getSharedPreferences("openstick_prefs", Context.MODE_PRIVATE) }
+    val palette = LocalOpenStickPalette.current
 
     // State
     var serviceActive by remember { mutableStateOf(false) }
@@ -76,6 +79,7 @@ fun SettingsScreen(
 
     // Dropdown expanded states
     var themeDropdownExpanded by remember { mutableStateOf(false) }
+    var uiScaleDropdownExpanded by remember { mutableStateOf(false) }
     var dpiDropdownExpanded by remember { mutableStateOf(false) }
     var dnsDropdownExpanded by remember { mutableStateOf(false) }
 
@@ -271,7 +275,7 @@ fun SettingsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(AmoledBackground)
+            .background(palette.background)
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
@@ -305,11 +309,11 @@ fun SettingsScreen(
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
                     modifier = Modifier
-                        .background(AmoledGlassHigh)
-                        .border(1.dp, AmoledGlassBorder, RoundedCornerShape(8.dp))
+                        .background(palette.glassHigh)
+                        .border(1.dp, palette.glassBorder, RoundedCornerShape(8.dp))
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Restart PulseAudio Server", color = Color.White, fontSize = 13.sp) },
+                        text = { Text("Restart PulseAudio Server", color = palette.text, fontSize = 13.sp) },
                         leadingIcon = { Icon(Icons.AutoMirrored.Filled.VolumeUp, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
                         onClick = {
                             menuOpen = false
@@ -323,7 +327,7 @@ fun SettingsScreen(
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("Clear Temporary Cache", color = Color.White, fontSize = 13.sp) },
+                        text = { Text("Clear Temporary Cache", color = palette.text, fontSize = 13.sp) },
                         leadingIcon = { Icon(Icons.Default.DeleteSweep, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
                         onClick = {
                             menuOpen = false
@@ -334,7 +338,7 @@ fun SettingsScreen(
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("Reset Theme to AMOLED Cyan", color = Color.White, fontSize = 13.sp) },
+                        text = { Text("Reset Theme to AMOLED Cyan", color = palette.text, fontSize = 13.sp) },
                         leadingIcon = { Icon(Icons.Default.Palette, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
                         onClick = {
                             menuOpen = false
@@ -351,7 +355,7 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(12.dp))
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = AmoledContainerHigh)
+                colors = CardDefaults.cardColors(containerColor = palette.containerHigh)
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(actionMessage, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
@@ -375,7 +379,7 @@ fun SettingsScreen(
             summary = "${currentAccent.title} • ${selectedDpi} DPI",
             initiallyExpanded = true
         ) {
-            Text("Application Theme", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+            Text("Application Theme", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.text)
             Spacer(modifier = Modifier.height(6.dp))
 
             Box(modifier = Modifier.fillMaxWidth()) {
@@ -384,7 +388,7 @@ fun SettingsScreen(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .clickable { themeDropdownExpanded = !themeDropdownExpanded },
-                    color = AmoledContainerHigh,
+                    color = palette.containerHigh,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Row(
@@ -395,6 +399,7 @@ fun SettingsScreen(
                     ) {
                         val (themeColor, themeBorder) = when (currentTheme) {
                             AppThemeMode.AMOLED_BLACK -> Color.Black to Color.White.copy(alpha = 0.6f)
+                            AppThemeMode.DRACULA -> Color(0xFF282A36) to Color(0xFFBD93F9)
                             AppThemeMode.DARK -> Color(0xFF1E1E1E) to Color(0xFF757575)
                             AppThemeMode.LIGHT -> Color.White to Color(0xFFCCCCCC)
                             AppThemeMode.SYSTEM -> Color(0xFF2E7D32) to Color(0xFF81C784)
@@ -410,23 +415,25 @@ fun SettingsScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             val themeTitle = when (currentTheme) {
                                 AppThemeMode.AMOLED_BLACK -> "AMOLED Pitch Black"
+                                AppThemeMode.DRACULA -> "Dracula Theme"
                                 AppThemeMode.DARK -> "Charcoal Dark"
                                 AppThemeMode.LIGHT -> "Light Theme"
                                 AppThemeMode.SYSTEM -> "Follow System Mode"
                             }
                             val themeSubtitle = when (currentTheme) {
                                 AppThemeMode.AMOLED_BLACK -> "Pure black #000000 • Best battery life"
+                                AppThemeMode.DRACULA -> "Classic vampire theme • Dark purple & cyan"
                                 AppThemeMode.DARK -> "Subtle dark gray tone"
                                 AppThemeMode.LIGHT -> "Clean daylight appearance"
                                 AppThemeMode.SYSTEM -> "Matches Android system dark/light mode"
                             }
-                            Text(themeTitle, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White)
-                            Text(themeSubtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(themeTitle, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = palette.text)
+                            Text(themeSubtitle, fontSize = 11.sp, color = palette.textDim)
                         }
                         Icon(
                             if (themeDropdownExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
                             contentDescription = null,
-                            tint = Color.White
+                            tint = palette.text
                         )
                     }
                 }
@@ -434,11 +441,12 @@ fun SettingsScreen(
                     expanded = themeDropdownExpanded,
                     onDismissRequest = { themeDropdownExpanded = false },
                     modifier = Modifier
-                        .background(AmoledContainerHigh)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                        .background(palette.containerHigh)
+                        .border(1.dp, palette.border, RoundedCornerShape(8.dp))
                 ) {
                     listOf(
                         Triple(AppThemeMode.AMOLED_BLACK, "AMOLED Pitch Black", "Pure black #000000 • Best battery life"),
+                        Triple(AppThemeMode.DRACULA, "Dracula Theme", "Classic vampire theme • Dark purple & cyan"),
                         Triple(AppThemeMode.DARK, "Charcoal Dark", "Subtle dark gray tone"),
                         Triple(AppThemeMode.LIGHT, "Light Theme", "Clean daylight appearance"),
                         Triple(AppThemeMode.SYSTEM, "Follow System", "Matches Android system dark/light mode")
@@ -447,8 +455,8 @@ fun SettingsScreen(
                         DropdownMenuItem(
                             text = {
                                 Column {
-                                    Text(name, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White)
-                                    Text(desc, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(name, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else palette.text)
+                                    Text(desc, fontSize = 11.sp, color = palette.textDim)
                                 }
                             },
                             onClick = {
@@ -458,6 +466,7 @@ fun SettingsScreen(
                             leadingIcon = {
                                 val (c, b) = when (mode) {
                                     AppThemeMode.AMOLED_BLACK -> Color.Black to Color.White.copy(alpha = 0.6f)
+                                    AppThemeMode.DRACULA -> Color(0xFF282A36) to Color(0xFFBD93F9)
                                     AppThemeMode.DARK -> Color(0xFF1E1E1E) to Color(0xFF757575)
                                     AppThemeMode.LIGHT -> Color.White to Color(0xFFCCCCCC)
                                     AppThemeMode.SYSTEM -> Color(0xFF2E7D32) to Color(0xFF81C784)
@@ -480,8 +489,83 @@ fun SettingsScreen(
                 }
             }
 
+            // UI Element Scaling (5 options)
             Spacer(modifier = Modifier.height(14.dp))
-            Text("Desktop UI Scale (DPI)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+            Text("App UI Element Scale (5 Options)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.text)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text("Adjust touch target, font, and component scale across the whole app", fontSize = 11.sp, color = palette.textDim)
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { uiScaleDropdownExpanded = !uiScaleDropdownExpanded },
+                    color = palette.containerHigh,
+                    border = BorderStroke(1.dp, palette.border)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.AspectRatio,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(currentUiScale.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = palette.text)
+                            Text(currentUiScale.description, fontSize = 11.sp, color = palette.textDim)
+                        }
+                        Icon(
+                            if (uiScaleDropdownExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            tint = palette.text
+                        )
+                    }
+                }
+
+                DropdownMenu(
+                    expanded = uiScaleDropdownExpanded,
+                    onDismissRequest = { uiScaleDropdownExpanded = false },
+                    modifier = Modifier
+                        .background(palette.containerHigh)
+                        .border(1.dp, palette.border, RoundedCornerShape(8.dp))
+                ) {
+                    for (scale in UiScale.values()) {
+                        val isSelected = currentUiScale == scale
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(
+                                        scale.title,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else palette.text
+                                    )
+                                    Text(scale.description, fontSize = 11.sp, color = palette.textDim)
+                                }
+                            },
+                            onClick = {
+                                onUiScaleChange(scale)
+                                uiScaleDropdownExpanded = false
+                            },
+                            trailingIcon = {
+                                if (isSelected) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+            Text("Desktop UI Scale (DPI)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.text)
             Spacer(modifier = Modifier.height(6.dp))
 
             Box(modifier = Modifier.fillMaxWidth()) {
@@ -490,7 +574,7 @@ fun SettingsScreen(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .clickable { dpiDropdownExpanded = !dpiDropdownExpanded },
-                    color = AmoledContainerHigh,
+                    color = palette.containerHigh,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Row(
@@ -513,13 +597,13 @@ fun SettingsScreen(
                                 240 -> "240 DPI (Large UI)" to "Larger buttons and text for high-res screens"
                                 else -> "192 DPI (Recommended)" to "Optimal default scale for mobile touchscreens"
                             }
-                            Text(dpiTitle, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White)
+                            Text(dpiTitle, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = palette.text)
                             Text(dpiSubtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Icon(
                             if (dpiDropdownExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
                             contentDescription = null,
-                            tint = Color.White
+                            tint = palette.text
                         )
                     }
                 }
@@ -527,7 +611,7 @@ fun SettingsScreen(
                     expanded = dpiDropdownExpanded,
                     onDismissRequest = { dpiDropdownExpanded = false },
                     modifier = Modifier
-                        .background(AmoledContainerHigh)
+                        .background(palette.containerHigh)
                         .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
                 ) {
                     listOf(
@@ -540,7 +624,7 @@ fun SettingsScreen(
                         DropdownMenuItem(
                             text = {
                                 Column {
-                                    Text(name, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White)
+                                    Text(name, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else palette.text)
                                     Text(desc, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             },
@@ -574,10 +658,10 @@ fun SettingsScreen(
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
                             .clickable { onAccentChange(accent) },
-                        color = if (isSelected) AmoledGlassHigh else AmoledGlassContainer,
+                        color = if (isSelected) palette.glassHigh else palette.glassContainer,
                         border = BorderStroke(
                             width = if (isSelected) 2.dp else 1.dp,
-                            color = if (isSelected) accent.color else AmoledGlassBorder
+                            color = if (isSelected) accent.color else palette.glassBorder
                         ),
                         shape = RoundedCornerShape(8.dp)
                     ) {
@@ -780,7 +864,7 @@ fun SettingsScreen(
             summary = "$selectedDns • SSH ${if (sshEnabled) "2222" else "Off"}",
             initiallyExpanded = false
         ) {
-            Text("DNS Server Configuration", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+            Text("DNS Server Configuration", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.text)
             Spacer(modifier = Modifier.height(6.dp))
 
             Box(modifier = Modifier.fillMaxWidth()) {
@@ -789,7 +873,7 @@ fun SettingsScreen(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .clickable { dnsDropdownExpanded = !dnsDropdownExpanded },
-                    color = AmoledContainerHigh,
+                    color = palette.containerHigh,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Row(
@@ -813,13 +897,13 @@ fun SettingsScreen(
                                 "Custom" -> "Custom DNS" to (if (customDnsIp.isNotEmpty()) customDnsIp else "Manual nameserver IP")
                                 else -> selectedDns to "Custom configuration"
                             }
-                            Text(dnsTitle, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White)
+                            Text(dnsTitle, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = palette.text)
                             Text(dnsSubtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Icon(
                             if (dnsDropdownExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
                             contentDescription = null,
-                            tint = Color.White
+                            tint = palette.text
                         )
                     }
                 }
@@ -827,7 +911,7 @@ fun SettingsScreen(
                     expanded = dnsDropdownExpanded,
                     onDismissRequest = { dnsDropdownExpanded = false },
                     modifier = Modifier
-                        .background(AmoledContainerHigh)
+                        .background(palette.containerHigh)
                         .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
                 ) {
                     listOf(
@@ -840,7 +924,7 @@ fun SettingsScreen(
                         DropdownMenuItem(
                             text = {
                                 Column {
-                                    Text(name, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White)
+                                    Text(name, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else palette.text)
                                     Text(desc, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             },
@@ -961,7 +1045,7 @@ fun SettingsScreen(
             Text(
                 text = "Android Process Limit Budget: ${processBudget.toInt()} max",
                 fontSize = 13.sp,
-                color = Color.White
+                color = palette.text
             )
             Slider(
                 value = processBudget,
@@ -1125,16 +1209,16 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp)),
-            color = AmoledGlassContainer,
+            color = palette.glassContainer,
             shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, AmoledGlassBorder)
+            border = BorderStroke(1.dp, palette.glassBorder)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "OpenStick Linux",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = palette.text
                 )
                 Text(
                     text = "Version 1.0.0 (Clean-Room Community Edition)",
@@ -1176,7 +1260,7 @@ fun SettingsScreen(
                     Text("Cancel")
                 }
             },
-            containerColor = AmoledContainer
+            containerColor = palette.container
         )
     }
 }
@@ -1189,15 +1273,16 @@ private fun SettingsSection(
     initiallyExpanded: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val palette = LocalOpenStickPalette.current
     var isExpanded by remember { mutableStateOf(initiallyExpanded) }
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp)),
-        color = AmoledGlassContainer,
+        color = palette.glassContainer,
         shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, AmoledGlassBorder)
+        border = BorderStroke(1.dp, palette.glassBorder)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -1219,7 +1304,7 @@ private fun SettingsSection(
                     title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
+                    color = palette.text,
                     modifier = Modifier.weight(1f)
                 )
                 if (summary.isNotEmpty() && !isExpanded) {
@@ -1228,7 +1313,7 @@ private fun SettingsSection(
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
-                            .background(AmoledGlassHigh, RoundedCornerShape(6.dp))
+                            .background(palette.glassHigh, RoundedCornerShape(6.dp))
                             .padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -1236,7 +1321,7 @@ private fun SettingsSection(
                 Icon(
                     if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                     contentDescription = if (isExpanded) "Collapse" else "Expand",
-                    tint = Color.Gray,
+                    tint = palette.textDim,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -1255,6 +1340,7 @@ private fun SwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
+    val palette = LocalOpenStickPalette.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1263,7 +1349,7 @@ private fun SwitchRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White)
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = palette.text)
             Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(modifier = Modifier.width(12.dp))
@@ -1271,7 +1357,7 @@ private fun SwitchRow(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
+                checkedThumbColor = palette.background,
                 checkedTrackColor = MaterialTheme.colorScheme.primary
             )
         )

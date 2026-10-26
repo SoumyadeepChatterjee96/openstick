@@ -16,7 +16,7 @@ class RootfsDownloader(
     private val desktop: Boolean = false
 ) {
     companion object {
-        const val BASE_URL = "https://cdn.breadstick.io/rootfs"
+        const val BASE_URL = "https://github.com/SoumyadeepChatterjee96/openstick/releases/download/rootfs-v1"
     }
 
     val imageFile: File
