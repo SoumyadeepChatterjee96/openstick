@@ -72,6 +72,32 @@ class LinuxEnvironment(val context: Context) {
         } catch (_: Exception) {}
     }
 
+    fun extractXkb() {
+        val xkbTarget = File(context.filesDir, "xkb")
+        if (File(xkbTarget, "rules/evdev").exists()) return
+        try {
+            xkbTarget.mkdirs()
+            context.assets.open("xkb.tar.gz").use { input ->
+                java.util.zip.GZIPInputStream(input).use { gzip ->
+                    org.apache.commons.compress.archivers.tar.TarArchiveInputStream(gzip).use { tar ->
+                        while (true) {
+                            val entry = tar.nextTarEntry ?: break
+                            val outPath = File(context.filesDir, entry.name)
+                            if (entry.isDirectory) {
+                                outPath.mkdirs()
+                            } else {
+                                outPath.parentFile?.mkdirs()
+                                FileOutputStream(outPath).use { out ->
+                                    tar.copyTo(out)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
     fun extractAssetScripts() {
         ensureDirectories()
         val assetList = listOf(

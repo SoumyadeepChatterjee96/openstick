@@ -54,10 +54,13 @@ class X11Server(
             Os.setenv("TMPDIR", env.tmpDir.absolutePath, true)
             Os.setenv("BREADSTICK_ROOTLESS", "1", true)
 
-            // Resolve XKB configuration root from Debian guest
+            // Resolve XKB configuration root from Debian guest or bundled assets
+            env.extractXkb()
             val xkbCandidates = listOf(
                 File(env.rootfsDir, "usr/share/X11/xkb"),
-                File(env.rootfsDir, "usr/share/xkeyboard-config-2")
+                File(env.rootfsDir, "usr/share/xkeyboard-config-2"),
+                File(env.context.filesDir, "xkb"),
+                File("/data/local/tmp/xkb")
             )
             val validXkb = xkbCandidates.firstOrNull { it.isDirectory }
             if (validXkb != null) {

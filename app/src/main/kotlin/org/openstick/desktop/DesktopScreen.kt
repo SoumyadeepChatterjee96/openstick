@@ -194,6 +194,10 @@ fun DesktopScreen(
                     Button(
                         onClick = {
                             if (!isX11Running) {
+                                if (!env.isInstalled()) {
+                                    desktopStatus = "Linux system not installed. Complete setup on Home tab first."
+                                    return@Button
+                                }
                                 desktopStatus = "Starting X11 server..."
                                 x11Server.start { success ->
                                     isX11Running = success

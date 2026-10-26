@@ -56,6 +56,13 @@ open class LorieView @JvmOverloads constructor(
         @JvmStatic external fun setViewport(x: Int, y: Int, w: Int, h: Int, screenW: Int, screenH: Int)
         @JvmStatic external fun startLogcat(fd: Int)
 
+        @JvmStatic
+        fun setRendererViewport(
+            i: Int, i2: Int, i3: Int, i4: Int,
+            f: Float, f2: Float, f3: Float, f4: Float
+        ) {
+        }
+
         @Volatile
         var windowListener: WindowListener? = null
         @Volatile
