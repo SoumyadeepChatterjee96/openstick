@@ -172,7 +172,9 @@ class LinuxEnvironment(val context: Context) {
 
     fun startDesktopCommand(display: Int = 0, user: String = "root"): String {
         installDesktopScripts()
-        return "rm -f /tmp/runtime-*/bus /tmp/.X$display-lock 2>/dev/null; export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export DISPLAY=:$display; export OPENSTICK_DARK=1; export BREADSTICK_DARK=1; export OPENSTICK_DPI=192; export BREADSTICK_DPI=192; export OPENSTICK_LOCALE=C.UTF-8; export BREADSTICK_LOCALE=C.UTF-8; F=/usr/lib/openstick/start-desktop-x11.sh; [ -f \"\$F\" ] || F=/usr/lib/breadstick/start-desktop-x11.sh; [ -f \"\$F\" ] || F=/usr/local/bin/start-desktop-x11; [ -f \"\$F\" ] || F=/root/.openstick/start-desktop-x11.sh; [ -f \"\$F\" ] || F=/root/.breadstick/start-desktop-x11.sh; if [ -f \"\$F\" ]; then exec sh \"\$F\" $display $user 0; else exec startxfce4 2>/dev/null || exec openbox-session 2>/dev/null || exec twm; fi"
+        val prefs = context.getSharedPreferences("openstick_prefs", Context.MODE_PRIVATE)
+        val dpi = prefs.getInt("desktop_dpi", 192)
+        return "rm -f /tmp/runtime-*/bus /tmp/.X$display-lock 2>/dev/null; export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export DISPLAY=:$display; export OPENSTICK_DARK=1; export BREADSTICK_DARK=1; export OPENSTICK_DPI=$dpi; export BREADSTICK_DPI=$dpi; export OPENSTICK_LOCALE=C.UTF-8; export BREADSTICK_LOCALE=C.UTF-8; F=/usr/lib/openstick/start-desktop-x11.sh; [ -f \"\$F\" ] || F=/usr/lib/breadstick/start-desktop-x11.sh; [ -f \"\$F\" ] || F=/usr/local/bin/start-desktop-x11; [ -f \"\$F\" ] || F=/root/.openstick/start-desktop-x11.sh; [ -f \"\$F\" ] || F=/root/.breadstick/start-desktop-x11.sh; if [ -f \"\$F\" ]; then exec sh \"\$F\" $display $user 0; else exec startxfce4 2>/dev/null || exec openbox-session 2>/dev/null || exec twm; fi"
     }
 
     private fun procStandIns(): List<String> {

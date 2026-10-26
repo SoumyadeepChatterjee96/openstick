@@ -2,23 +2,30 @@ package org.openstick.settings
 
 import android.Manifest
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -26,6 +33,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -62,18 +72,105 @@ fun SettingsScreen(
     var workFraction by remember { mutableFloatStateOf(0f) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
-    // Bridges State - initialized from preferences (default: false)
-    var cameraEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_camera", false)) }
-    var micEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_mic", false)) }
+    // Desktop Scale (DPI)
+    var selectedDpi by remember { mutableIntStateOf(prefs.getInt("desktop_dpi", 192)) }
+
+    // Dropdown expanded states
+    var themeDropdownExpanded by remember { mutableStateOf(false) }
+    var dpiDropdownExpanded by remember { mutableStateOf(false) }
+    var dnsDropdownExpanded by remember { mutableStateOf(false) }
+
+    // Bridges State - initialized from preferences clamped with runtime permissions
+    var cameraEnabled by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED &&
+            prefs.getBoolean("bridge_camera", false)
+        )
+    }
+    var micEnabled by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED &&
+            prefs.getBoolean("bridge_mic", false)
+        )
+    }
     var audioOutputEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_audio", false)) }
-    var notifEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_notif", false)) }
-    var calendarEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_calendar", false)) }
+    var notifEnabled by remember {
+        mutableStateOf(
+            (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            } else true) && prefs.getBoolean("bridge_notif", false)
+        )
+    }
+    var calendarEnabled by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED &&
+            prefs.getBoolean("bridge_calendar", false)
+        )
+    }
     var clipboardEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_clipboard", false)) }
     var printingEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_printing", false)) }
     var sshEnabled by remember { mutableStateOf(HardwareBridges.sshServerEnabled) }
     var vncEnabled by remember { mutableStateOf(HardwareBridges.vncServerEnabled) }
     var gpuEnabled by remember { mutableStateOf(GpuServer.isRunning) }
     var processBudget by remember { mutableFloatStateOf(HardwareBridges.processLimit.toFloat()) }
+
+    // Keep settings synchronized across app resume and preference updates
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val hasCam = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                val hasMic = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                val hasCal = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
+                val hasNotif = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                } else true
+                cameraEnabled = hasCam && prefs.getBoolean("bridge_camera", false)
+                micEnabled = hasMic && prefs.getBoolean("bridge_mic", false)
+                calendarEnabled = hasCal && prefs.getBoolean("bridge_calendar", false)
+                notifEnabled = hasNotif && prefs.getBoolean("bridge_notif", false)
+                audioOutputEnabled = prefs.getBoolean("bridge_audio", false)
+                clipboardEnabled = prefs.getBoolean("bridge_clipboard", false)
+                printingEnabled = prefs.getBoolean("bridge_printing", false)
+                selectedDpi = prefs.getInt("desktop_dpi", 192)
+                selectedDns = prefs.getString("selected_dns", "Cloudflare") ?: "Cloudflare"
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    DisposableEffect(prefs) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            when (key) {
+                "bridge_camera" -> {
+                    val hasCam = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                    cameraEnabled = hasCam && prefs.getBoolean("bridge_camera", false)
+                }
+                "bridge_mic" -> {
+                    val hasMic = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                    micEnabled = hasMic && prefs.getBoolean("bridge_mic", false)
+                }
+                "bridge_calendar" -> {
+                    val hasCal = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
+                    calendarEnabled = hasCal && prefs.getBoolean("bridge_calendar", false)
+                }
+                "bridge_notif" -> {
+                    val hasNotif = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                    } else true
+                    notifEnabled = hasNotif && prefs.getBoolean("bridge_notif", false)
+                }
+                "bridge_audio" -> audioOutputEnabled = prefs.getBoolean("bridge_audio", false)
+                "bridge_clipboard" -> clipboardEnabled = prefs.getBoolean("bridge_clipboard", false)
+                "bridge_printing" -> printingEnabled = prefs.getBoolean("bridge_printing", false)
+                "desktop_dpi" -> selectedDpi = prefs.getInt("desktop_dpi", 192)
+                "selected_dns" -> selectedDns = prefs.getString("selected_dns", "Cloudflare") ?: "Cloudflare"
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
 
     // Permission Launchers for runtime consent
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -213,32 +310,192 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Section 1: Display Theme
-        SettingsSection(title = "Display Theme", icon = Icons.Default.Palette) {
-            ThemeOption(
-                title = "AMOLED Pitch Black (Pure Black #000000)",
-                subtitle = "Maximizes battery life on OLED displays",
-                selected = currentTheme == AppThemeMode.AMOLED_BLACK,
-                onClick = { onThemeChange(AppThemeMode.AMOLED_BLACK) }
-            )
-            ThemeOption(
-                title = "Charcoal Dark",
-                subtitle = "Subtle dark gray tone",
-                selected = currentTheme == AppThemeMode.DARK,
-                onClick = { onThemeChange(AppThemeMode.DARK) }
-            )
-            ThemeOption(
-                title = "Light Theme",
-                subtitle = "Clean daylight appearance",
-                selected = currentTheme == AppThemeMode.LIGHT,
-                onClick = { onThemeChange(AppThemeMode.LIGHT) }
-            )
-            ThemeOption(
-                title = "Follow System",
-                subtitle = "Matches Android system dark/light mode",
-                selected = currentTheme == AppThemeMode.SYSTEM,
-                onClick = { onThemeChange(AppThemeMode.SYSTEM) }
-            )
+        // Section 1: Display & Appearance
+        SettingsSection(title = "Display & Appearance", icon = Icons.Default.Palette) {
+            Text("Application Theme", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { themeDropdownExpanded = !themeDropdownExpanded },
+                    color = AmoledContainerHigh,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val (themeColor, themeBorder) = when (currentTheme) {
+                            AppThemeMode.AMOLED_BLACK -> Color.Black to Color.White.copy(alpha = 0.6f)
+                            AppThemeMode.DARK -> Color(0xFF1E1E1E) to Color(0xFF757575)
+                            AppThemeMode.LIGHT -> Color.White to Color(0xFFCCCCCC)
+                            AppThemeMode.SYSTEM -> Color(0xFF2E7D32) to Color(0xFF81C784)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(18.dp)
+                                .clip(CircleShape)
+                                .background(themeColor)
+                                .border(1.5.dp, themeBorder, CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            val themeTitle = when (currentTheme) {
+                                AppThemeMode.AMOLED_BLACK -> "AMOLED Pitch Black"
+                                AppThemeMode.DARK -> "Charcoal Dark"
+                                AppThemeMode.LIGHT -> "Light Theme"
+                                AppThemeMode.SYSTEM -> "Follow System Mode"
+                            }
+                            val themeSubtitle = when (currentTheme) {
+                                AppThemeMode.AMOLED_BLACK -> "Pure black #000000 • Best battery life"
+                                AppThemeMode.DARK -> "Subtle dark gray tone"
+                                AppThemeMode.LIGHT -> "Clean daylight appearance"
+                                AppThemeMode.SYSTEM -> "Matches Android system dark/light mode"
+                            }
+                            Text(themeTitle, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White)
+                            Text(themeSubtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Icon(
+                            if (themeDropdownExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            tint = Color.White
+                        )
+                    }
+                }
+                DropdownMenu(
+                    expanded = themeDropdownExpanded,
+                    onDismissRequest = { themeDropdownExpanded = false },
+                    modifier = Modifier
+                        .background(AmoledContainerHigh)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                ) {
+                    listOf(
+                        Triple(AppThemeMode.AMOLED_BLACK, "AMOLED Pitch Black", "Pure black #000000 • Best battery life"),
+                        Triple(AppThemeMode.DARK, "Charcoal Dark", "Subtle dark gray tone"),
+                        Triple(AppThemeMode.LIGHT, "Light Theme", "Clean daylight appearance"),
+                        Triple(AppThemeMode.SYSTEM, "Follow System", "Matches Android system dark/light mode")
+                    ).forEach { (mode, name, desc) ->
+                        val isSelected = currentTheme == mode
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(name, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White)
+                                    Text(desc, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            },
+                            onClick = {
+                                onThemeChange(mode)
+                                themeDropdownExpanded = false
+                            },
+                            leadingIcon = {
+                                val (c, b) = when (mode) {
+                                    AppThemeMode.AMOLED_BLACK -> Color.Black to Color.White.copy(alpha = 0.6f)
+                                    AppThemeMode.DARK -> Color(0xFF1E1E1E) to Color(0xFF757575)
+                                    AppThemeMode.LIGHT -> Color.White to Color(0xFFCCCCCC)
+                                    AppThemeMode.SYSTEM -> Color(0xFF2E7D32) to Color(0xFF81C784)
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clip(CircleShape)
+                                        .background(c)
+                                        .border(1.5.dp, b, CircleShape)
+                                )
+                            },
+                            trailingIcon = {
+                                if (isSelected) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+            Text("Desktop UI Scale (DPI)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { dpiDropdownExpanded = !dpiDropdownExpanded },
+                    color = AmoledContainerHigh,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.AspectRatio,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            val (dpiTitle, dpiSubtitle) = when (selectedDpi) {
+                                96 -> "96 DPI (Desktop 1:1)" to "Classic desktop scale • Maximum workspace"
+                                144 -> "144 DPI (Medium Scale)" to "Balanced scale for foldables & small tablets"
+                                240 -> "240 DPI (Large UI)" to "Larger buttons and text for high-res screens"
+                                else -> "192 DPI (Recommended)" to "Optimal default scale for mobile touchscreens"
+                            }
+                            Text(dpiTitle, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White)
+                            Text(dpiSubtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Icon(
+                            if (dpiDropdownExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            tint = Color.White
+                        )
+                    }
+                }
+                DropdownMenu(
+                    expanded = dpiDropdownExpanded,
+                    onDismissRequest = { dpiDropdownExpanded = false },
+                    modifier = Modifier
+                        .background(AmoledContainerHigh)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                ) {
+                    listOf(
+                        Triple(192, "192 DPI (Recommended)", "Optimal default scale for mobile touchscreens"),
+                        Triple(144, "144 DPI (Medium Scale)", "Balanced scale for foldables & small tablets"),
+                        Triple(96, "96 DPI (Desktop 1:1)", "Classic desktop scale • Maximum workspace"),
+                        Triple(240, "240 DPI (Large UI)", "Larger buttons and text for high-res screens")
+                    ).forEach { (dpi, name, desc) ->
+                        val isSelected = selectedDpi == dpi
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(name, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White)
+                                    Text(desc, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            },
+                            onClick = {
+                                selectedDpi = dpi
+                                prefs.edit().putInt("desktop_dpi", dpi).apply()
+                                actionMessage = "Desktop scale set to $dpi DPI (applies on next desktop launch)"
+                                dpiDropdownExpanded = false
+                            },
+                            trailingIcon = {
+                                if (isSelected) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -392,7 +649,7 @@ fun SettingsScreen(
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(Icons.Default.VolumeUp, contentDescription = null, modifier = Modifier.size(16.dp))
+                Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Restart PulseAudio Server")
             }
@@ -405,23 +662,86 @@ fun SettingsScreen(
             Text("DNS Server Configuration", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
             Spacer(modifier = Modifier.height(6.dp))
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf("Cloudflare", "Google", "OpenDNS", "Custom").forEach { dns ->
-                    FilterChip(
-                        selected = selectedDns == dns,
-                        onClick = {
-                            selectedDns = dns
-                            prefs.edit().putString("selected_dns", dns).apply()
-                            HardwareBridges.applyDnsConfig(env, dns, customDnsIp)
-                            actionMessage = "Applied $dns DNS to Linux environment"
-                        },
-                        label = { Text(dns, fontSize = 11.sp) }
-                    )
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { dnsDropdownExpanded = !dnsDropdownExpanded },
+                    color = AmoledContainerHigh,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Dns,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            val (dnsTitle, dnsSubtitle) = when (selectedDns) {
+                                "Cloudflare" -> "Cloudflare DNS" to "1.1.1.1 / 1.0.0.1 • Fast & Privacy-first"
+                                "Google" -> "Google Public DNS" to "8.8.8.8 / 8.8.4.4 • Global High Availability"
+                                "OpenDNS" -> "OpenDNS" to "208.67.222.222 • Security & Anti-Phishing"
+                                "Custom" -> "Custom DNS" to (if (customDnsIp.isNotEmpty()) customDnsIp else "Manual nameserver IP")
+                                else -> selectedDns to "Custom configuration"
+                            }
+                            Text(dnsTitle, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White)
+                            Text(dnsSubtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Icon(
+                            if (dnsDropdownExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            tint = Color.White
+                        )
+                    }
+                }
+                DropdownMenu(
+                    expanded = dnsDropdownExpanded,
+                    onDismissRequest = { dnsDropdownExpanded = false },
+                    modifier = Modifier
+                        .background(AmoledContainerHigh)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                ) {
+                    listOf(
+                        Triple("Cloudflare", "Cloudflare DNS", "1.1.1.1 / 1.0.0.1 • Fast & Privacy-first"),
+                        Triple("Google", "Google Public DNS", "8.8.8.8 / 8.8.4.4 • Global High Availability"),
+                        Triple("OpenDNS", "OpenDNS", "208.67.222.222 • Security & Anti-Phishing"),
+                        Triple("Custom", "Custom DNS", "Enter custom DNS server IP address")
+                    ).forEach { (dns, name, desc) ->
+                        val isSelected = selectedDns == dns
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(name, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White)
+                                    Text(desc, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            },
+                            onClick = {
+                                selectedDns = dns
+                                prefs.edit().putString("selected_dns", dns).apply()
+                                HardwareBridges.applyDnsConfig(env, dns, customDnsIp)
+                                actionMessage = "Applied $dns DNS to Linux environment"
+                                dnsDropdownExpanded = false
+                            },
+                            trailingIcon = {
+                                if (isSelected) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        )
+                    }
                 }
             }
 
             if (selectedDns == "Custom") {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 OutlinedTextField(
                     value = customDnsIp,
                     onValueChange = {
@@ -429,9 +749,13 @@ fun SettingsScreen(
                         prefs.edit().putString("custom_dns_ip", it).apply()
                         HardwareBridges.applyDnsConfig(env, "Custom", it)
                     },
-                    label = { Text("Custom DNS IP (e.g., 9.9.9.9)") },
+                    label = { Text("Custom DNS IP (e.g. 9.9.9.9)") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                    )
                 )
             }
 
@@ -763,31 +1087,5 @@ private fun SwitchRow(
                 checkedTrackColor = MaterialTheme.colorScheme.primary
             )
         )
-    }
-}
-
-@Composable
-private fun ThemeOption(
-    title: String,
-    subtitle: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(
-            selected = selected,
-            onClick = onClick,
-            colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.primary)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Column {
-            Text(title, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color.White)
-            Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
     }
 }

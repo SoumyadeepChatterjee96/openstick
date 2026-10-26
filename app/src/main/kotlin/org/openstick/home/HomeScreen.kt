@@ -1,7 +1,9 @@
 package org.openstick.home
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -9,6 +11,9 @@ import android.os.Environment
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -52,6 +57,7 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val prefs = remember { context.getSharedPreferences("openstick_prefs", Context.MODE_PRIVATE) }
     var isInstalled by remember { mutableStateOf(env.isInstalled()) }
     var serviceActive by remember { mutableStateOf(false) }
     var actionMessage by remember { mutableStateOf("") }
@@ -94,17 +100,113 @@ fun HomeScreen(
         )
     }
 
-    val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        hasMicPermission = it
+    // Bridge enabled toggles from settings (default: false)
+    var camBridgeEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_camera", false)) }
+    var micBridgeEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_mic", false)) }
+    var calBridgeEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_calendar", false)) }
+    var notifBridgeEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_notif", false)) }
+    var printingBridgeEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_printing", false)) }
+
+    // Sync bridge states on resume and on SharedPreferences changes
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                hasStoragePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    Environment.isExternalStorageManager()
+                } else {
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+                }
+                hasMicPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                hasCamPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                hasNotifPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                } else true
+                hasCalPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
+                camBridgeEnabled = prefs.getBoolean("bridge_camera", false)
+                micBridgeEnabled = prefs.getBoolean("bridge_mic", false)
+                calBridgeEnabled = prefs.getBoolean("bridge_calendar", false)
+                notifBridgeEnabled = prefs.getBoolean("bridge_notif", false)
+                printingBridgeEnabled = prefs.getBoolean("bridge_printing", false)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
-    val camLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        hasCamPermission = it
+
+    DisposableEffect(prefs) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            when (key) {
+                "bridge_camera" -> camBridgeEnabled = prefs.getBoolean("bridge_camera", false)
+                "bridge_mic" -> micBridgeEnabled = prefs.getBoolean("bridge_mic", false)
+                "bridge_calendar" -> calBridgeEnabled = prefs.getBoolean("bridge_calendar", false)
+                "bridge_notif" -> notifBridgeEnabled = prefs.getBoolean("bridge_notif", false)
+                "bridge_printing" -> printingBridgeEnabled = prefs.getBoolean("bridge_printing", false)
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
     }
-    val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        hasNotifPermission = it
+
+    val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        hasMicPermission = granted
+        if (granted) {
+            micBridgeEnabled = true
+            prefs.edit().putBoolean("bridge_mic", true).apply()
+            HardwareBridges.toggleMic(context, env.rootfsDir, scope, true)
+            actionMessage = "Microphone permission granted • Audio input active"
+        } else {
+            micBridgeEnabled = false
+            prefs.edit().putBoolean("bridge_mic", false).apply()
+            HardwareBridges.toggleMic(context, env.rootfsDir, scope, false)
+            actionMessage = "Microphone permission denied"
+        }
     }
-    val calLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        hasCalPermission = it
+    val camLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        hasCamPermission = granted
+        if (granted) {
+            camBridgeEnabled = true
+            prefs.edit().putBoolean("bridge_camera", true).apply()
+            HardwareBridges.toggleCamera(context, env.rootfsDir, scope, true)
+            actionMessage = "Camera permission granted • Bridge active"
+        } else {
+            camBridgeEnabled = false
+            prefs.edit().putBoolean("bridge_camera", false).apply()
+            HardwareBridges.toggleCamera(context, env.rootfsDir, scope, false)
+            actionMessage = "Camera permission denied"
+        }
+    }
+    val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        hasNotifPermission = granted
+        if (granted) {
+            notifBridgeEnabled = true
+            prefs.edit().putBoolean("bridge_notif", true).apply()
+            HardwareBridges.toggleNotifications(context, env.rootfsDir, true)
+            actionMessage = "Notification permission granted • Alerts active"
+        } else {
+            notifBridgeEnabled = false
+            prefs.edit().putBoolean("bridge_notif", false).apply()
+            HardwareBridges.toggleNotifications(context, env.rootfsDir, false)
+            actionMessage = "Notification permission denied"
+        }
+    }
+    val calLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        hasCalPermission = granted
+        if (granted) {
+            calBridgeEnabled = true
+            prefs.edit().putBoolean("bridge_calendar", true).apply()
+            HardwareBridges.toggleCalendar(context, env.rootfsDir, true)
+            actionMessage = "Calendar permission granted • Sync active"
+        } else {
+            calBridgeEnabled = false
+            prefs.edit().putBoolean("bridge_calendar", false).apply()
+            HardwareBridges.toggleCalendar(context, env.rootfsDir, false)
+            actionMessage = "Calendar permission denied"
+        }
     }
     val storageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         hasStoragePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -238,12 +340,18 @@ fun HomeScreen(
             shape = RoundedCornerShape(14.dp)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
+                // Device files
+                val (filesStatus, filesState) = if (hasStoragePermission) {
+                    "Allowed" to BridgeState.ACTIVE
+                } else {
+                    "Tap to Allow" to BridgeState.NEEDS_PERMISSION
+                }
                 DeviceAccessRow(
                     icon = Icons.Default.Folder,
                     title = "Device files",
                     detail = "Shared storage mounted at /mnt/sdcard and /sdcard",
-                    status = if (hasStoragePermission) "Allowed" else "Tap to Allow",
-                    isAllowed = hasStoragePermission,
+                    status = filesStatus,
+                    state = filesState,
                     onClick = {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                             try {
@@ -262,57 +370,131 @@ fun HomeScreen(
                 )
                 HorizontalDivider(color = AmoledContainerHigh, modifier = Modifier.padding(vertical = 10.dp))
 
+                // Microphone
+                val (micStatus, micState) = when {
+                    !hasMicPermission -> "Tap to Allow" to BridgeState.NEEDS_PERMISSION
+                    !micBridgeEnabled -> "Disabled" to BridgeState.DISABLED
+                    else -> "Active" to BridgeState.ACTIVE
+                }
                 DeviceAccessRow(
                     icon = Icons.Default.Mic,
                     title = "Microphone",
                     detail = "Audio input piped through PulseAudio bridge",
-                    status = if (hasMicPermission) "Active" else "Tap to Allow",
-                    isAllowed = hasMicPermission,
-                    onClick = { micLauncher.launch(Manifest.permission.RECORD_AUDIO) }
-                )
-                HorizontalDivider(color = AmoledContainerHigh, modifier = Modifier.padding(vertical = 10.dp))
-
-                DeviceAccessRow(
-                    icon = Icons.Default.PhotoCamera,
-                    title = "Camera",
-                    detail = "Hardware video stream at /run/openstick/camera",
-                    status = if (hasCamPermission) "Active" else "Tap to Allow",
-                    isAllowed = hasCamPermission,
-                    onClick = { camLauncher.launch(Manifest.permission.CAMERA) }
-                )
-                HorizontalDivider(color = AmoledContainerHigh, modifier = Modifier.padding(vertical = 10.dp))
-
-                DeviceAccessRow(
-                    icon = Icons.Default.Event,
-                    title = "Calendar",
-                    detail = "Android calendar synchronization into guest",
-                    status = if (hasCalPermission) "Synced" else "Tap to Allow",
-                    isAllowed = hasCalPermission,
-                    onClick = { calLauncher.launch(Manifest.permission.READ_CALENDAR) }
-                )
-                HorizontalDivider(color = AmoledContainerHigh, modifier = Modifier.padding(vertical = 10.dp))
-
-                DeviceAccessRow(
-                    icon = Icons.Default.Notifications,
-                    title = "Android notifications",
-                    detail = "Bidirectional notify-send desktop notification bridge",
-                    status = if (hasNotifPermission) "Active" else "Tap to Allow",
-                    isAllowed = hasNotifPermission,
+                    status = micStatus,
+                    state = micState,
                     onClick = {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        if (!hasMicPermission) {
+                            micLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        } else {
+                            val newState = !micBridgeEnabled
+                            micBridgeEnabled = newState
+                            prefs.edit().putBoolean("bridge_mic", newState).apply()
+                            HardwareBridges.toggleMic(context, env.rootfsDir, scope, newState)
+                            actionMessage = if (newState) "Microphone bridge enabled" else "Microphone bridge disabled"
                         }
                     }
                 )
                 HorizontalDivider(color = AmoledContainerHigh, modifier = Modifier.padding(vertical = 10.dp))
 
+                // Camera
+                val (camStatus, camState) = when {
+                    !hasCamPermission -> "Tap to Allow" to BridgeState.NEEDS_PERMISSION
+                    !camBridgeEnabled -> "Disabled" to BridgeState.DISABLED
+                    else -> "Active" to BridgeState.ACTIVE
+                }
+                DeviceAccessRow(
+                    icon = Icons.Default.PhotoCamera,
+                    title = "Camera",
+                    detail = "Hardware video stream at /run/openstick/camera",
+                    status = camStatus,
+                    state = camState,
+                    onClick = {
+                        if (!hasCamPermission) {
+                            camLauncher.launch(Manifest.permission.CAMERA)
+                        } else {
+                            val newState = !camBridgeEnabled
+                            camBridgeEnabled = newState
+                            prefs.edit().putBoolean("bridge_camera", newState).apply()
+                            HardwareBridges.toggleCamera(context, env.rootfsDir, scope, newState)
+                            actionMessage = if (newState) "Camera bridge enabled" else "Camera bridge disabled"
+                        }
+                    }
+                )
+                HorizontalDivider(color = AmoledContainerHigh, modifier = Modifier.padding(vertical = 10.dp))
+
+                // Calendar
+                val (calStatus, calState) = when {
+                    !hasCalPermission -> "Tap to Allow" to BridgeState.NEEDS_PERMISSION
+                    !calBridgeEnabled -> "Disabled" to BridgeState.DISABLED
+                    else -> "Synced" to BridgeState.ACTIVE
+                }
+                DeviceAccessRow(
+                    icon = Icons.Default.Event,
+                    title = "Calendar",
+                    detail = "Android calendar synchronization into guest",
+                    status = calStatus,
+                    state = calState,
+                    onClick = {
+                        if (!hasCalPermission) {
+                            calLauncher.launch(Manifest.permission.READ_CALENDAR)
+                        } else {
+                            val newState = !calBridgeEnabled
+                            calBridgeEnabled = newState
+                            prefs.edit().putBoolean("bridge_calendar", newState).apply()
+                            HardwareBridges.toggleCalendar(context, env.rootfsDir, newState)
+                            actionMessage = if (newState) "Calendar sync enabled" else "Calendar sync disabled"
+                        }
+                    }
+                )
+                HorizontalDivider(color = AmoledContainerHigh, modifier = Modifier.padding(vertical = 10.dp))
+
+                // Notifications
+                val (notifStatus, notifState) = when {
+                    !hasNotifPermission -> "Tap to Allow" to BridgeState.NEEDS_PERMISSION
+                    !notifBridgeEnabled -> "Disabled" to BridgeState.DISABLED
+                    else -> "Active" to BridgeState.ACTIVE
+                }
+                DeviceAccessRow(
+                    icon = Icons.Default.Notifications,
+                    title = "Android notifications",
+                    detail = "Bidirectional notify-send desktop notification bridge",
+                    status = notifStatus,
+                    state = notifState,
+                    onClick = {
+                        if (!hasNotifPermission) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        } else {
+                            val newState = !notifBridgeEnabled
+                            notifBridgeEnabled = newState
+                            prefs.edit().putBoolean("bridge_notif", newState).apply()
+                            HardwareBridges.toggleNotifications(context, env.rootfsDir, newState)
+                            actionMessage = if (newState) "Notifications enabled" else "Notifications disabled"
+                        }
+                    }
+                )
+                HorizontalDivider(color = AmoledContainerHigh, modifier = Modifier.padding(vertical = 10.dp))
+
+                // Printing
+                val (printStatus, printState) = if (printingBridgeEnabled) {
+                    "Ready" to BridgeState.ACTIVE
+                } else {
+                    "Disabled" to BridgeState.DISABLED
+                }
                 DeviceAccessRow(
                     icon = Icons.Default.Print,
                     title = "Printing",
                     detail = "CUPS / PDF direct printer backend service",
-                    status = "Ready",
-                    isAllowed = true,
-                    onClick = { actionMessage = "Printing bridge is active." }
+                    status = printStatus,
+                    state = printState,
+                    onClick = {
+                        val newState = !printingBridgeEnabled
+                        printingBridgeEnabled = newState
+                        prefs.edit().putBoolean("bridge_printing", newState).apply()
+                        HardwareBridges.togglePrinting(context, env.rootfsDir, newState)
+                        actionMessage = if (newState) "Printing spooler active" else "Printing bridge stopped"
+                    }
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -609,15 +791,27 @@ private fun LaunchTile(
     }
 }
 
+enum class BridgeState {
+    ACTIVE,
+    DISABLED,
+    NEEDS_PERMISSION
+}
+
 @Composable
 private fun DeviceAccessRow(
     icon: ImageVector,
     title: String,
     detail: String,
     status: String,
-    isAllowed: Boolean,
+    state: BridgeState,
     onClick: () -> Unit
 ) {
+    val (badgeBg, badgeText, iconTint) = when (state) {
+        BridgeState.ACTIVE -> Triple(Color(0xFF1B5E20), Color(0xFF81C784), MaterialTheme.colorScheme.primary)
+        BridgeState.DISABLED -> Triple(Color(0xFF222222), Color(0xFF9E9E9E), Color(0xFF757575))
+        BridgeState.NEEDS_PERMISSION -> Triple(Color(0xFFE65100), Color(0xFFFFCC80), Color(0xFFFFB300))
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -628,7 +822,7 @@ private fun DeviceAccessRow(
         Icon(
             icon,
             contentDescription = null,
-            tint = if (isAllowed) MaterialTheme.colorScheme.primary else Color(0xFFFFB300),
+            tint = iconTint,
             modifier = Modifier.size(20.dp)
         )
         Spacer(modifier = Modifier.width(12.dp))
@@ -638,13 +832,13 @@ private fun DeviceAccessRow(
         }
         Spacer(modifier = Modifier.width(8.dp))
         Surface(
-            color = if (isAllowed) Color(0xFF1B5E20) else Color(0xFFE65100),
+            color = badgeBg,
             shape = RoundedCornerShape(6.dp)
         ) {
             Text(
                 text = status,
                 style = MaterialTheme.typography.labelSmall,
-                color = Color.White,
+                color = badgeText,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 11.sp,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
