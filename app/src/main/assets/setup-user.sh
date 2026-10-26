@@ -65,6 +65,13 @@ printf 'Welcome to OpenStick Linux.\n' > /etc/motd 2>/dev/null || true
 #
 # Marked and guarded so it is appended once and is obvious to anyone who wants it gone: deleting
 # the two lines is the supported way to turn it off.
+# Clean up any legacy Breadstick greetings
+sed -i '/bsl-fetch/d' "$BRC" 2>/dev/null || true
+sed -i '/Breadstick greeting/d' "$BRC" 2>/dev/null || true
+sed -i '/bsl-fetch/d' /etc/skel/.bashrc 2>/dev/null || true
+sed -i '/Breadstick greeting/d' /etc/skel/.bashrc 2>/dev/null || true
+rm -f /usr/bin/bsl-fetch 2>/dev/null || true
+
 BRC="/home/$U/.bashrc"
 if [ -f "$BRC" ] && ! grep -q 'openstick-fetch' "$BRC" 2>/dev/null; then
     cat >> "$BRC" <<'BRCEOF'

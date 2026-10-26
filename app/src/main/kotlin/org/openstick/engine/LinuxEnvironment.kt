@@ -162,6 +162,14 @@ class LinuxEnvironment(val context: Context) {
             File(rootfsDir, "usr/local/bin/openstick-fetch").setExecutable(true, false)
             File(rootfsDir, "usr/bin/openstick-fetch").setExecutable(true, false)
 
+            // Remove legacy bsl-fetch binary to prevent duplicate MOTD banners
+            try {
+                val legacyBsl = File(rootfsDir, "usr/bin/bsl-fetch")
+                if (legacyBsl.exists()) legacyBsl.delete()
+                val legacyBslLocal = File(rootfsDir, "usr/local/bin/bsl-fetch")
+                if (legacyBslLocal.exists()) legacyBslLocal.delete()
+            } catch (_: Exception) {}
+
             // Neutralize 90gpg-agent so XFCE4 session never hangs on PRoot Unix sockets
             val gpgAgentScript = File(rootfsDir, "etc/X11/Xsession.d/90gpg-agent")
             if (gpgAgentScript.exists()) {
