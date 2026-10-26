@@ -9,18 +9,27 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.openstick.MainActivity
+import java.io.File
 
 class SessionService : LifecycleService() {
     companion object {
         const val CHANNEL_ID = "openstick_session"
         const val NOTIFICATION_ID = 1001
+
+        var isRunning by mutableStateOf(false)
+            internal set
 
         fun start(context: Context) {
             val intent = Intent(context, SessionService::class.java)
@@ -29,11 +38,104 @@ class SessionService : LifecycleService() {
             } else {
                 context.startService(intent)
             }
+            isRunning = true
         }
 
         fun stop(context: Context) {
             val intent = Intent(context, SessionService::class.java)
             context.stopService(intent)
+            isRunning = false
+        }
+
+        fun cleanSockets(env: LinuxEnvironment): Int {
+            var cleanedCount = 0
+            val rootfs = env.rootfsDir
+            val tmpDir = File(rootfs, "tmp")
+            if (tmpDir.exists()) {
+                tmpDir.listFiles()?.forEach { file ->
+                    val name = file.name
+                    if (name.startsWith(".X") || name.startsWith(".winch") || name.startsWith("pulse") || name.contains("-lock")) {
+                        try {
+                            if (file.isDirectory) file.deleteRecursively() else file.delete()
+                            cleanedCount++
+                        } catch (_: Exception) {}
+                    }
+                }
+            }
+            val runDir = File(rootfs, "run/openstick")
+            if (runDir.exists()) {
+                runDir.listFiles()?.forEach { file ->
+                    if (file.name.endsWith(".sock") || file.name.endsWith(".lock")) {
+                        try {
+                            file.delete()
+                            cleanedCount++
+                        } catch (_: Exception) {}
+                    }
+                }
+            }
+            return cleanedCount
+        }
+
+        fun reboot(
+            context: Context,
+            env: LinuxEnvironment,
+            runner: ProotRunner,
+            scope: CoroutineScope,
+            onProgress: (String) -> Unit = {}
+        ) {
+            scope.launch(Dispatchers.IO) {
+                onProgress("Stopping session processes...")
+                try {
+                    runner.killSync()
+                } catch (_: Exception) {}
+                try {
+                    HardwareBridges.stopAll()
+                } catch (_: Exception) {}
+                stop(context)
+
+                onProgress("Purging lock and socket files...")
+                val cleaned = cleanSockets(env)
+
+                kotlinx.coroutines.delay(500)
+
+                onProgress("Starting clean Linux session...")
+                start(context)
+                try {
+                    HardwareBridges.startAll(context, env, scope)
+                } catch (_: Exception) {}
+
+                onProgress("Session rebooted successfully ($cleaned locks purged)")
+            }
+        }
+
+        fun forceKillAll(
+            context: Context,
+            env: LinuxEnvironment,
+            runner: ProotRunner,
+            scope: CoroutineScope,
+            onProgress: (String) -> Unit = {}
+        ) {
+            scope.launch(Dispatchers.IO) {
+                onProgress("Force terminating guest and proot processes...")
+                try {
+                    runner.killSync()
+                } catch (_: Exception) {}
+                try {
+                    Runtime.getRuntime().exec(
+                        arrayOf(
+                            "sh",
+                            "-c",
+                            "pkill -9 -f proot 2>/dev/null; pkill -9 -f libproot 2>/dev/null; pkill -9 -f xfce4 2>/dev/null; pkill -9 -f bash 2>/dev/null; pkill -9 -f pulseaudio 2>/dev/null || true"
+                        )
+                    ).waitFor()
+                } catch (_: Exception) {}
+                try {
+                    HardwareBridges.stopAll()
+                } catch (_: Exception) {}
+                stop(context)
+                val cleaned = cleanSockets(env)
+                onProgress("All processes killed • $cleaned locks cleared")
+            }
         }
     }
 
@@ -43,6 +145,7 @@ class SessionService : LifecycleService() {
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         createNotificationChannel()
         val notification = buildNotification()
         startForeground(NOTIFICATION_ID, notification)
@@ -59,6 +162,7 @@ class SessionService : LifecycleService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        isRunning = false
         serviceScope.cancel()
         HardwareBridges.stopAll()
         if (wakeLock?.isHeld == true) {

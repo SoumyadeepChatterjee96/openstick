@@ -19,6 +19,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -330,6 +331,214 @@ fun HomeScreen(
                 modifier = Modifier.weight(1f),
                 onClick = onNavigateTerminal
             )
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Session Controls Section (Individual Action Buttons)
+        val isSessionActive = SessionService.isRunning
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = palette.glassContainer),
+            shape = RoundedCornerShape(18.dp),
+            border = BorderStroke(1.dp, palette.glassBorder)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                // Header: Title & Dynamic Status
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.PowerSettingsNew,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "Session Controls",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = palette.text
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isSessionActive) Color(0xFF00E676) else Color(0xFF757575))
+                                )
+                                Text(
+                                    text = if (isSessionActive) "Active • Background wakelock on" else "Inactive • Stopped",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (isSessionActive) Color(0xFF00E676) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isSessionActive) Color(0x2200E676) else palette.containerHigh,
+                        border = BorderStroke(1.dp, if (isSessionActive) Color(0xFF00E676).copy(alpha = 0.5f) else palette.border)
+                    ) {
+                        Text(
+                            text = if (isSessionActive) "RUNNING" else "STANDBY",
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSessionActive) Color(0xFF00E676) else palette.textDim
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Row 1: Primary Lifecycle (Start, Stop, Reboot)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SessionActionButton(
+                        icon = Icons.Default.PlayArrow,
+                        label = "Start",
+                        subtitle = "Launch Session",
+                        color = Color(0xFF00E676),
+                        textColor = palette.text,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            SessionService.start(context)
+                            try {
+                                HardwareBridges.startAll(context, env, scope)
+                            } catch (_: Exception) {}
+                            actionMessage = "Session started • Background persistence & wakelock active"
+                        }
+                    )
+
+                    SessionActionButton(
+                        icon = Icons.Default.Stop,
+                        label = "Stop",
+                        subtitle = "Graceful Halt",
+                        color = Color(0xFFFF5252),
+                        textColor = palette.text,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            runner.stop()
+                            HardwareBridges.stopAll()
+                            SessionService.stop(context)
+                            actionMessage = "Session stopped • Background services halted"
+                        }
+                    )
+
+                    SessionActionButton(
+                        icon = Icons.Default.RestartAlt,
+                        label = "Reboot",
+                        subtitle = "Fresh Restart",
+                        color = Color(0xFFFFB300),
+                        textColor = palette.text,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            SessionService.reboot(context, env, runner, scope) { msg ->
+                                actionMessage = msg
+                            }
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Row 2: Diagnostics & Utility Actions (Kill All, Clean Locks)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SessionActionButton(
+                        icon = Icons.Default.FlashOn,
+                        label = "Kill All",
+                        subtitle = "Force Terminate",
+                        color = Color(0xFFFF3D00),
+                        textColor = palette.text,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            SessionService.forceKillAll(context, env, runner, scope) { msg ->
+                                actionMessage = msg
+                            }
+                        }
+                    )
+
+                    SessionActionButton(
+                        icon = Icons.Default.CleaningServices,
+                        label = "Clean Locks",
+                        subtitle = "Purge /tmp Locks",
+                        color = Color(0xFF64B5F6),
+                        textColor = palette.text,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            val count = SessionService.cleanSockets(env)
+                            actionMessage = "Purged $count socket & lock files from /tmp"
+                        }
+                    )
+                }
+
+                // Live status/action feedback banner
+                if (actionMessage.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = palette.containerHigh,
+                        border = BorderStroke(1.dp, palette.border),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = actionMessage,
+                                fontSize = 11.sp,
+                                color = palette.text,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(
+                                onClick = { actionMessage = "" },
+                                modifier = Modifier.size(20.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Dismiss",
+                                    tint = palette.textDim,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -900,6 +1109,57 @@ private fun DeviceAccessRow(
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 11.sp,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SessionActionButton(
+    icon: ImageVector,
+    label: String,
+    subtitle: String,
+    color: Color,
+    borderColor: Color = color.copy(alpha = 0.5f),
+    textColor: Color = Color.White,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = color.copy(alpha = 0.14f),
+        border = BorderStroke(1.dp, borderColor),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = color,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = label,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                color = textColor,
+                textAlign = TextAlign.Center,
+                maxLines = 1
+            )
+            Text(
+                text = subtitle,
+                fontSize = 9.5.sp,
+                color = textColor.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center,
+                maxLines = 1
             )
         }
     }
