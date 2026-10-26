@@ -54,7 +54,7 @@ class SessionService : LifecycleService() {
             if (tmpDir.exists()) {
                 tmpDir.listFiles()?.forEach { file ->
                     val name = file.name
-                    if (name.startsWith(".X") || name.startsWith(".winch") || name.startsWith("pulse") || name.contains("-lock")) {
+                    if (name.startsWith(".X") || name.startsWith(".winch") || name.startsWith("pulse") || name.contains("-lock") || name.startsWith(".openstick-")) {
                         try {
                             if (file.isDirectory) file.deleteRecursively() else file.delete()
                             cleanedCount++
@@ -71,6 +71,36 @@ class SessionService : LifecycleService() {
                             cleanedCount++
                         } catch (_: Exception) {}
                     }
+                }
+            }
+            // Stale DPKG and APT package manager locks
+            val dpkgDir = File(rootfs, "var/lib/dpkg")
+            if (dpkgDir.exists()) {
+                listOf("lock", "lock-frontend").forEach { lockName ->
+                    val f = File(dpkgDir, lockName)
+                    if (f.exists()) {
+                        try {
+                            if (f.delete()) cleanedCount++
+                        } catch (_: Exception) {}
+                    }
+                }
+            }
+            val aptListsDir = File(rootfs, "var/lib/apt/lists")
+            if (aptListsDir.exists()) {
+                val f = File(aptListsDir, "lock")
+                if (f.exists()) {
+                    try {
+                        if (f.delete()) cleanedCount++
+                    } catch (_: Exception) {}
+                }
+            }
+            val aptArchivesDir = File(rootfs, "var/cache/apt/archives")
+            if (aptArchivesDir.exists()) {
+                val f = File(aptArchivesDir, "lock")
+                if (f.exists()) {
+                    try {
+                        if (f.delete()) cleanedCount++
+                    } catch (_: Exception) {}
                 }
             }
             return cleanedCount

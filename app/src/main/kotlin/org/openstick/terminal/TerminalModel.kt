@@ -169,12 +169,16 @@ class TerminalTab(
     }
 
     fun stop() {
-        try {
-            write("exit\n")
-            Thread.sleep(100)
-            process?.destroy()
-            winchFifo.delete()
-        } catch (_: Exception) {}
+        val proc = process
+        val fifo = winchFifo
+        scope.launch(Dispatchers.IO) {
+            try {
+                write("exit\n")
+                kotlinx.coroutines.delay(100)
+                proc?.destroy()
+                if (fifo.exists()) fifo.delete()
+            } catch (_: Exception) {}
+        }
         isRunning = false
         process = null
         stdin = null

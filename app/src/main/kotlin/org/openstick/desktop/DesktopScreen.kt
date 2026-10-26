@@ -62,11 +62,8 @@ import org.openstick.engine.HardwareBridges
 import org.openstick.engine.LinuxEnvironment
 import org.openstick.engine.ProotRunner
 import org.openstick.engine.WebVncServer
-import org.openstick.ui.theme.AmoledBackground
-import org.openstick.ui.theme.AmoledContainer
-import org.openstick.ui.theme.AmoledContainerHigh
-import org.openstick.ui.theme.AmoledGlassBorder
-import org.openstick.ui.theme.AmoledGlassContainer
+import androidx.activity.compose.BackHandler
+import org.openstick.ui.theme.LocalOpenStickPalette
 import java.net.Inet4Address
 import java.net.NetworkInterface
 
@@ -75,10 +72,12 @@ fun DesktopScreen(
     env: LinuxEnvironment,
     x11Server: X11Server,
     runner: ProotRunner,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNavigateHome: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val palette = LocalOpenStickPalette.current
     val clipboardManager = LocalClipboardManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
@@ -87,6 +86,7 @@ fun DesktopScreen(
     var isGpuRunning by remember { mutableStateOf(GpuServer.isRunning) }
     var isWebVncRunning by remember { mutableStateOf(WebVncServer.current != null) }
     var desktopStatus by remember { mutableStateOf("Desktop ready") }
+    var showExitDialog by remember { mutableStateOf(false) }
 
     var lorieViewRef by remember { mutableStateOf<LorieView?>(null) }
     var isKeyboardVisible by remember { mutableStateOf(false) }
@@ -100,6 +100,18 @@ fun DesktopScreen(
     var isTrackpadMode by remember { mutableStateOf(false) }
     var showQuickMenu by remember { mutableStateOf(false) }
     var showScreenShareDialog by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = true) {
+        if (showScreenShareDialog) {
+            showScreenShareDialog = false
+        } else if (showQuickMenu) {
+            showQuickMenu = false
+        } else if (isToolbarExpanded) {
+            isToolbarExpanded = false
+        } else {
+            showExitDialog = true
+        }
+    }
 
     val activity = context as? Activity
     var isImmersiveEnabled by remember { mutableStateOf(true) }
@@ -177,7 +189,7 @@ fun DesktopScreen(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .padding(24.dp),
-                colors = CardDefaults.cardColors(containerColor = AmoledContainer),
+                colors = CardDefaults.cardColors(containerColor = palette.container),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(
@@ -195,7 +207,7 @@ fun DesktopScreen(
                         text = "Linux Not Installed",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = palette.text
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -545,8 +557,8 @@ fun DesktopScreen(
                     Surface(
                         onClick = { isToolbarExpanded = true },
                         shape = RoundedCornerShape(20.dp),
-                        color = AmoledGlassContainer,
-                        border = BorderStroke(1.dp, AmoledGlassBorder),
+                        color = palette.glassContainer,
+                        border = BorderStroke(1.dp, palette.glassBorder),
                         shadowElevation = 8.dp,
                         modifier = Modifier.height(36.dp)
                     ) {
@@ -565,7 +577,7 @@ fun DesktopScreen(
                                 text = "Tools ▲",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = Color.White
+                                color = palette.text
                             )
                         }
                     }
@@ -573,8 +585,8 @@ fun DesktopScreen(
                     // Expanded Floating Toolbar Pill
                     Surface(
                         shape = RoundedCornerShape(22.dp),
-                        color = AmoledGlassContainer,
-                        border = BorderStroke(1.dp, AmoledGlassBorder),
+                        color = palette.glassContainer,
+                        border = BorderStroke(1.dp, palette.glassBorder),
                         shadowElevation = 10.dp,
                         modifier = Modifier.height(44.dp)
                     ) {
@@ -642,7 +654,7 @@ fun DesktopScreen(
                                 lorieViewRef?.sendMouseEvent(lastTapX, lastTapY, 3, false, false)
                             }
 
-                            VerticalDivider(modifier = Modifier.height(18.dp).padding(horizontal = 2.dp), color = AmoledContainerHigh)
+                            VerticalDivider(modifier = Modifier.height(18.dp).padding(horizontal = 2.dp), color = palette.border)
 
                             // Modifier keys
                             DesktopKeyChip("ESC") {
@@ -674,7 +686,7 @@ fun DesktopScreen(
                                 lorieViewRef?.sendKeyEvent(108, 20, false, 0)
                             }
 
-                            VerticalDivider(modifier = Modifier.height(18.dp).padding(horizontal = 2.dp), color = AmoledContainerHigh)
+                            VerticalDivider(modifier = Modifier.height(18.dp).padding(horizontal = 2.dp), color = palette.border)
 
                             // Window Management Controls (Un-stick, Maximize, Close)
                             DesktopKeyChip("✕ Close") {
@@ -714,7 +726,7 @@ fun DesktopScreen(
                                 }
                             }
 
-                            VerticalDivider(modifier = Modifier.height(18.dp).padding(horizontal = 2.dp), color = AmoledContainerHigh)
+                            VerticalDivider(modifier = Modifier.height(18.dp).padding(horizontal = 2.dp), color = palette.border)
 
                             // Horizontal Landscape / Vertical Portrait orientation toggle
                             DesktopKeyChip(if (isLandscape) "⤾ Portrait" else "⤿ Landscape", active = isLandscape) {
@@ -726,7 +738,7 @@ fun DesktopScreen(
                                 isImmersiveEnabled = !isImmersiveEnabled
                             }
 
-                            VerticalDivider(modifier = Modifier.height(18.dp).padding(horizontal = 2.dp), color = AmoledContainerHigh)
+                            VerticalDivider(modifier = Modifier.height(18.dp).padding(horizontal = 2.dp), color = palette.border)
 
                             // Screen Sharing / WebVNC
                             IconButton(
@@ -736,7 +748,7 @@ fun DesktopScreen(
                                 Icon(
                                     Icons.Default.ScreenShare,
                                     contentDescription = "Screen Sharing",
-                                    tint = if (isWebVncRunning) Color(0xFF00FF66) else Color.White,
+                                    tint = if (isWebVncRunning) Color(0xFF00FF66) else palette.text,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -750,7 +762,7 @@ fun DesktopScreen(
                                     Icon(
                                         Icons.Default.MoreVert,
                                         contentDescription = "Quick Menu",
-                                        tint = Color.White,
+                                        tint = palette.text,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -758,10 +770,10 @@ fun DesktopScreen(
                                 DropdownMenu(
                                     expanded = showQuickMenu,
                                     onDismissRequest = { showQuickMenu = false },
-                                    modifier = Modifier.background(AmoledContainer)
+                                    modifier = Modifier.background(palette.container)
                                 ) {
                                     DropdownMenuItem(
-                                        text = { Text("Open Terminal", color = Color.White, fontSize = 13.sp) },
+                                        text = { Text("Open Terminal", color = palette.text, fontSize = 13.sp) },
                                         leadingIcon = { Icon(Icons.Default.Terminal, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
                                         onClick = {
                                             showQuickMenu = false
@@ -774,7 +786,7 @@ fun DesktopScreen(
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Open File Manager", color = Color.White, fontSize = 13.sp) },
+                                        text = { Text("Open File Manager", color = palette.text, fontSize = 13.sp) },
                                         leadingIcon = { Icon(Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
                                         onClick = {
                                             showQuickMenu = false
@@ -787,7 +799,7 @@ fun DesktopScreen(
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Open App Finder", color = Color.White, fontSize = 13.sp) },
+                                        text = { Text("Open App Finder", color = palette.text, fontSize = 13.sp) },
                                         leadingIcon = { Icon(Icons.Default.Apps, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
                                         onClick = {
                                             showQuickMenu = false
@@ -799,7 +811,7 @@ fun DesktopScreen(
                                             }
                                         }
                                     )
-                                    HorizontalDivider(color = AmoledContainerHigh)
+                                    HorizontalDivider(color = palette.border)
                                     DropdownMenuItem(
                                         text = { Text("Close Active Window (Alt+F4)", color = Color(0xFFFF5252), fontSize = 13.sp) },
                                         leadingIcon = { Icon(Icons.Default.Close, null, tint = Color(0xFFFF5252), modifier = Modifier.size(18.dp)) },
@@ -814,7 +826,7 @@ fun DesktopScreen(
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Un-stick Window (Move Down)", color = Color.White, fontSize = 13.sp) },
+                                        text = { Text("Un-stick Window (Move Down)", color = palette.text, fontSize = 13.sp) },
                                         leadingIcon = { Icon(Icons.Default.OpenWith, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
                                         onClick = {
                                             showQuickMenu = false
@@ -827,7 +839,7 @@ fun DesktopScreen(
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Toggle Maximize Window", color = Color.White, fontSize = 13.sp) },
+                                        text = { Text("Toggle Maximize Window", color = palette.text, fontSize = 13.sp) },
                                         leadingIcon = { Icon(Icons.Default.Fullscreen, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
                                         onClick = {
                                             showQuickMenu = false
@@ -839,9 +851,9 @@ fun DesktopScreen(
                                             }
                                         }
                                     )
-                                    HorizontalDivider(color = AmoledContainerHigh)
+                                    HorizontalDivider(color = palette.border)
                                     DropdownMenuItem(
-                                        text = { Text("Restart XFCE Desktop", color = Color.White, fontSize = 13.sp) },
+                                        text = { Text("Restart XFCE Desktop", color = palette.text, fontSize = 13.sp) },
                                         leadingIcon = { Icon(Icons.Default.Refresh, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
                                         onClick = {
                                             showQuickMenu = false
@@ -857,7 +869,7 @@ fun DesktopScreen(
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text(if (isGpuRunning) "Turn 3D GPU OFF" else "Turn 3D GPU ON", color = if (isGpuRunning) Color(0xFF00FF66) else Color.White, fontSize = 13.sp) },
+                                        text = { Text(if (isGpuRunning) "Turn 3D GPU OFF" else "Turn 3D GPU ON", color = if (isGpuRunning) Color(0xFF00FF66) else palette.text, fontSize = 13.sp) },
                                         leadingIcon = { Icon(Icons.Default.Speed, null, tint = if (isGpuRunning) Color(0xFF00FF66) else Color.Gray, modifier = Modifier.size(18.dp)) },
                                         onClick = {
                                             showQuickMenu = false
@@ -869,7 +881,7 @@ fun DesktopScreen(
                                             }
                                         }
                                     )
-                                    HorizontalDivider(color = AmoledContainerHigh)
+                                    HorizontalDivider(color = palette.border)
                                     DropdownMenuItem(
                                         text = { Text("Stop Desktop Session", color = Color(0xFFFF5252), fontSize = 13.sp) },
                                         leadingIcon = { Icon(Icons.Default.Stop, null, tint = Color(0xFFFF5252), modifier = Modifier.size(18.dp)) },
@@ -891,6 +903,53 @@ fun DesktopScreen(
         }
     }
 
+    // 3. Desktop Exit Safeguard Dialog
+    if (showExitDialog) {
+        AlertDialog(
+            onDismissRequest = { showExitDialog = false },
+            icon = {
+                Icon(
+                    Icons.Default.DesktopWindows,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Minimize Desktop Session?",
+                    fontWeight = FontWeight.Bold,
+                    color = palette.text
+                )
+            },
+            text = {
+                Text(
+                    text = "Your X11 desktop environment and open graphical applications will keep running smoothly in the background.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showExitDialog = false
+                        onNavigateHome()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Minimize to Home")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitDialog = false }) {
+                    Text("Stay in Desktop", color = palette.textDim)
+                }
+            },
+            containerColor = palette.container,
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+
     // 4. WebVNC Screen Sharing Dialog
     if (showScreenShareDialog) {
         val localIp = remember { getLocalIpAddress() }
@@ -907,7 +966,7 @@ fun DesktopScreen(
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("HTML5 Screen Sharing", fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("HTML5 Screen Sharing", fontWeight = FontWeight.Bold, color = palette.text)
                 }
             },
             text = {
@@ -924,7 +983,7 @@ fun DesktopScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Server Status:", fontSize = 12.sp, color = Color.White)
+                        Text("Server Status:", fontSize = 12.sp, color = palette.text)
                         Badge(containerColor = if (isWebVncRunning) Color(0xFF1B5E20) else Color(0xFF424242)) {
                             Text(
                                 text = if (isWebVncRunning) "Streaming on :6080" else "Offline",
@@ -940,9 +999,9 @@ fun DesktopScreen(
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color.Black),
+                        colors = CardDefaults.cardColors(containerColor = palette.background),
                         shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, AmoledContainerHigh)
+                        border = BorderStroke(1.dp, palette.border)
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
                             Text("Direct Browser URL:", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -964,7 +1023,7 @@ fun DesktopScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Screen Orientation:", fontSize = 11.sp, color = Color.White)
+                        Text("Screen Orientation:", fontSize = 11.sp, color = palette.text)
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             FilterChip(
                                 selected = !isLandscape,
@@ -1046,10 +1105,10 @@ fun DesktopScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showScreenShareDialog = false }) {
-                    Text("Close", color = Color.LightGray)
+                    Text("Close", color = palette.textDim)
                 }
             },
-            containerColor = AmoledContainer
+            containerColor = palette.container
         )
     }
 }
@@ -1060,11 +1119,12 @@ private fun DesktopKeyChip(
     active: Boolean = false,
     onClick: () -> Unit
 ) {
+    val palette = LocalOpenStickPalette.current
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(14.dp),
-        color = if (active) MaterialTheme.colorScheme.primary else Color(0xCC242424),
-        border = BorderStroke(1.dp, if (active) MaterialTheme.colorScheme.primary else AmoledGlassBorder),
+        color = if (active) MaterialTheme.colorScheme.primary else palette.glassContainer,
+        border = BorderStroke(1.dp, if (active) MaterialTheme.colorScheme.primary else palette.glassBorder),
         modifier = Modifier.height(30.dp)
     ) {
         Box(
@@ -1075,7 +1135,7 @@ private fun DesktopKeyChip(
                 text = label,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (active) MaterialTheme.colorScheme.onPrimary else Color.White
+                color = if (active) MaterialTheme.colorScheme.onPrimary else palette.text
             )
         }
     }

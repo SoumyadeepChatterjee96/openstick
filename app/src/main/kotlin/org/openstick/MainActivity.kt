@@ -187,7 +187,8 @@ class MainActivity : ComponentActivity() {
                                     env = env,
                                     x11Server = x11Server,
                                     runner = mainRunner,
-                                    modifier = contentModifier
+                                    modifier = contentModifier,
+                                    onNavigateHome = { currentScreen = Screen.HOME }
                                 )
                                 Screen.MONITOR -> MonitorScreen(
                                     monitor = resourceMonitor,

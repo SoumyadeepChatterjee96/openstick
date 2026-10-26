@@ -487,13 +487,30 @@ fun HomeScreen(
                     SessionActionButton(
                         icon = Icons.Default.CleaningServices,
                         label = "Clean Locks",
-                        subtitle = "Purge /tmp Locks",
+                        subtitle = "Purge & Fix Dpkg",
                         color = Color(0xFF64B5F6),
                         textColor = palette.text,
                         modifier = Modifier.weight(1f),
                         onClick = {
                             val count = SessionService.cleanSockets(env)
-                            actionMessage = "Purged $count socket & lock files from /tmp"
+                            actionMessage = "Purged $count socket & lock files..."
+                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                try {
+                                    val exit = kotlinx.coroutines.withTimeoutOrNull(30_000L) {
+                                        runner.executeOneShot(
+                                            command = listOf("/usr/bin/dpkg", "--configure", "-a"),
+                                            asRoot = true
+                                        )
+                                    }
+                                    actionMessage = when (exit) {
+                                        0 -> "Purged $count locks • Package database verified"
+                                        null -> "Purged $count locks • Configure timed out"
+                                        else -> "Purged $count locks • Checked (exit $exit)"
+                                    }
+                                } catch (_: Exception) {
+                                    actionMessage = "Purged $count socket & lock files"
+                                }
+                            }
                         }
                     )
                 }

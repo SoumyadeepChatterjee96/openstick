@@ -37,13 +37,12 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
-import org.openstick.ui.theme.AmoledBackground
-import org.openstick.ui.theme.AmoledBorder
-import org.openstick.ui.theme.AmoledContainer
+import org.openstick.ui.theme.LocalOpenStickPalette
 
 @Composable
 fun TerminalScreen(
@@ -53,11 +52,16 @@ fun TerminalScreen(
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
+    val palette = LocalOpenStickPalette.current
+
+    BackHandler {
+        onNavigateHome()
+    }
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(AmoledBackground)
+            .background(palette.background)
             .statusBarsPadding()
             .navigationBarsPadding()
             .imePadding()
@@ -66,7 +70,7 @@ fun TerminalScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(AmoledContainer)
+                .background(palette.container)
                 .padding(start = 48.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -112,8 +116,8 @@ fun TerminalScreen(
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = MaterialTheme.colorScheme.primary,
                             selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                            containerColor = AmoledBackground,
-                            labelColor = MaterialTheme.colorScheme.onSurface
+                            containerColor = palette.containerHigh,
+                            labelColor = palette.textDim
                         ),
                         modifier = Modifier.padding(end = 4.dp)
                     )
@@ -169,7 +173,7 @@ fun TerminalScreen(
             }
         }
 
-        HorizontalDivider(color = AmoledBorder, thickness = 1.dp)
+        HorizontalDivider(color = palette.border, thickness = 1.dp)
 
         // Terminal Interactive Viewport
         Box(
@@ -209,7 +213,7 @@ fun TerminalScreen(
                                 )
                             }
                         }
-                        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = AmoledBorder)
+                        Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = palette.border)
                         Box(modifier = Modifier.weight(1f)) {
                             secondTab?.let {
                                 InteractiveTerminalPane(
@@ -243,7 +247,7 @@ fun TerminalScreen(
                                 )
                             }
                         }
-                        Divider(modifier = Modifier.fillMaxWidth().height(1.dp), color = AmoledBorder)
+                        Divider(modifier = Modifier.fillMaxWidth().height(1.dp), color = palette.border)
                         Box(modifier = Modifier.weight(1f)) {
                             secondTab?.let {
                                 InteractiveTerminalPane(
@@ -266,7 +270,7 @@ fun TerminalScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(AmoledContainer)
+                .background(palette.container)
                 .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 4.dp, vertical = 3.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -314,15 +318,16 @@ private fun ModifierKeyButton(
     isActive: Boolean,
     onClick: () -> Unit
 ) {
+    val palette = LocalOpenStickPalette.current
     Button(
         onClick = onClick,
         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
         shape = RoundedCornerShape(14.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (isActive) MaterialTheme.colorScheme.primary else Color(0xCC262626),
-            contentColor = if (isActive) MaterialTheme.colorScheme.onPrimary else Color(0xFFEDE9E4)
+            containerColor = if (isActive) MaterialTheme.colorScheme.primary else palette.containerHigh,
+            contentColor = if (isActive) MaterialTheme.colorScheme.onPrimary else palette.text
         ),
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (isActive) MaterialTheme.colorScheme.primary else Color(0x33FFFFFF)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isActive) MaterialTheme.colorScheme.primary else palette.border),
         modifier = Modifier.height(32.dp)
     ) {
         Text(
@@ -339,15 +344,16 @@ private fun QuickKeyButton(
     label: String,
     onClick: () -> Unit
 ) {
+    val palette = LocalOpenStickPalette.current
     Button(
         onClick = onClick,
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
         shape = RoundedCornerShape(14.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xCC1E1E1E),
-            contentColor = Color(0xFFEDE9E4)
+            containerColor = palette.containerHigh,
+            contentColor = palette.text
         ),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x22FFFFFF)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, palette.border),
         modifier = Modifier.height(32.dp)
     ) {
         Text(

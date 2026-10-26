@@ -45,9 +45,7 @@ import org.openstick.engine.LinuxEnvironment
 import org.openstick.engine.ProotRunner
 import org.openstick.terminal.InteractiveTerminalPane
 import org.openstick.terminal.TerminalSessionManager
-import org.openstick.ui.theme.AmoledBackground
-import org.openstick.ui.theme.AmoledBorder
-import org.openstick.ui.theme.AmoledContainer
+import org.openstick.ui.theme.LocalOpenStickPalette
 import org.openstick.ui.theme.OpenStickTheme
 
 class WindowActivity : ComponentActivity() {
@@ -407,11 +405,12 @@ fun WindowContent(
         }
 
         if (mode != WindowActivity.MODE_MONITOR) {
+            val palette = LocalOpenStickPalette.current
             // Quick Shortcut Strip (Pinned directly above the soft keyboard)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(AmoledContainer)
+                    .background(palette.container)
                     .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 4.dp, vertical = 3.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -422,7 +421,8 @@ fun WindowContent(
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                     shape = RoundedCornerShape(4.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (ctrlHeld) MaterialTheme.colorScheme.primary else Color(0xFF2B2B2B)
+                        containerColor = if (ctrlHeld) MaterialTheme.colorScheme.primary else palette.containerHigh,
+                        contentColor = if (ctrlHeld) MaterialTheme.colorScheme.onPrimary else palette.text
                     ),
                     modifier = Modifier.height(28.dp)
                 ) {
@@ -434,7 +434,8 @@ fun WindowContent(
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                     shape = RoundedCornerShape(4.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (altHeld) MaterialTheme.colorScheme.primary else Color(0xFF2B2B2B)
+                        containerColor = if (altHeld) MaterialTheme.colorScheme.primary else palette.containerHigh,
+                        contentColor = if (altHeld) MaterialTheme.colorScheme.onPrimary else palette.text
                     ),
                     modifier = Modifier.height(28.dp)
                 ) {
@@ -455,11 +456,12 @@ fun WindowContent(
 
 @Composable
 private fun SmallKey(label: String, onClick: () -> Unit) {
+    val palette = LocalOpenStickPalette.current
     Button(
         onClick = onClick,
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
         shape = RoundedCornerShape(4.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF222222), contentColor = Color.White),
+        colors = ButtonDefaults.buttonColors(containerColor = palette.containerHigh, contentColor = palette.text),
         modifier = Modifier.height(28.dp)
     ) {
         Text(label, fontSize = 11.sp, fontFamily = FontFamily.Monospace)

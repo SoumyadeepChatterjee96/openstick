@@ -22,9 +22,7 @@ import kotlinx.coroutines.withContext
 import org.openstick.engine.LinuxEnvironment
 import org.openstick.engine.RootfsDownloader
 import org.openstick.engine.RootfsInstaller
-import org.openstick.ui.theme.AmoledBackground
-import org.openstick.ui.theme.AmoledContainer
-import org.openstick.ui.theme.AmoledContainerHigh
+import org.openstick.ui.theme.LocalOpenStickPalette
 
 @Composable
 fun SetupWizard(
@@ -32,6 +30,7 @@ fun SetupWizard(
     onSetupFinished: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val palette = LocalOpenStickPalette.current
     val scope = rememberCoroutineScope()
     var isDesktopEdition by remember { mutableStateOf(false) }
     var username by remember { mutableStateOf("openstick") }
@@ -46,7 +45,7 @@ fun SetupWizard(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(AmoledBackground)
+            .background(palette.background)
             .verticalScroll(rememberScrollState())
             .padding(20.dp)
     ) {
@@ -80,7 +79,7 @@ fun SetupWizard(
             // Step 1: Edition selection
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = AmoledContainer),
+                colors = CardDefaults.cardColors(containerColor = palette.container),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -88,7 +87,7 @@ fun SetupWizard(
                         text = "1. Select Linux Edition",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White
+                        color = palette.text
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -115,7 +114,7 @@ fun SetupWizard(
             // Step 2: Credentials
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = AmoledContainer),
+                colors = CardDefaults.cardColors(containerColor = palette.container),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -123,7 +122,7 @@ fun SetupWizard(
                         text = "2. Linux Credentials",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White
+                        color = palette.text
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -255,7 +254,7 @@ fun SetupWizard(
             // Installing Progress View
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = AmoledContainer),
+                colors = CardDefaults.cardColors(containerColor = palette.container),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
@@ -263,7 +262,7 @@ fun SetupWizard(
                         text = "Setting Up OpenStick Linux",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = palette.text
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
@@ -273,7 +272,7 @@ fun SetupWizard(
                             .fillMaxWidth()
                             .height(8.dp),
                         color = MaterialTheme.colorScheme.primary,
-                        trackColor = AmoledContainerHigh
+                        trackColor = palette.containerHigh
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -281,7 +280,7 @@ fun SetupWizard(
                     Text(
                         text = statusText,
                         fontSize = 14.sp,
-                        color = Color.White,
+                        color = palette.text,
                         fontWeight = FontWeight.Medium
                     )
 
@@ -311,7 +310,7 @@ fun SetupWizard(
             // Completed View
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = AmoledContainer),
+                colors = CardDefaults.cardColors(containerColor = palette.container),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(
@@ -370,10 +369,11 @@ private fun EditionRadioRow(
     selected: Boolean,
     onClick: () -> Unit
 ) {
+    val palette = LocalOpenStickPalette.current
     Card(
         onClick = onClick,
         colors = CardDefaults.cardColors(
-            containerColor = if (selected) AmoledContainerHigh else Color.Transparent
+            containerColor = if (selected) palette.containerHigh else Color.Transparent
         ),
         shape = RoundedCornerShape(8.dp),
         modifier = Modifier.fillMaxWidth()
@@ -389,7 +389,7 @@ private fun EditionRadioRow(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Column {
-                Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.White)
+                Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = palette.text)
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(description, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
