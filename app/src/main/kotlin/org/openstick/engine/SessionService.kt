@@ -21,6 +21,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.openstick.MainActivity
+import org.openstick.R
 import java.io.File
 
 class SessionService : LifecycleService() {
@@ -50,15 +51,17 @@ class SessionService : LifecycleService() {
         fun cleanSockets(env: LinuxEnvironment): Int {
             var cleanedCount = 0
             val rootfs = env.rootfsDir
-            val tmpDir = File(rootfs, "tmp")
-            if (tmpDir.exists()) {
-                tmpDir.listFiles()?.forEach { file ->
-                    val name = file.name
-                    if (name.startsWith(".X") || name.startsWith(".winch") || name.startsWith("pulse") || name.contains("-lock") || name.startsWith(".openstick-")) {
-                        try {
-                            if (file.isDirectory) file.deleteRecursively() else file.delete()
-                            cleanedCount++
-                        } catch (_: Exception) {}
+            val tmpDirs = listOf(File(rootfs, "tmp"), env.tmpDir).distinct()
+            tmpDirs.forEach { dir ->
+                if (dir.exists()) {
+                    dir.listFiles()?.forEach { file ->
+                        val name = file.name
+                        if (name.startsWith(".X") || name.startsWith(".winch") || name.startsWith("pulse") || name.contains("-lock") || name.startsWith(".openstick-")) {
+                            try {
+                                if (file.isDirectory) file.deleteRecursively() else file.delete()
+                                cleanedCount++
+                            } catch (_: Exception) {}
+                        }
                     }
                 }
             }
@@ -232,7 +235,7 @@ class SessionService : LifecycleService() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("OpenStick Linux")
             .setContentText("Linux environment is active in background")
-            .setSmallIcon(android.R.drawable.ic_menu_manage)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)

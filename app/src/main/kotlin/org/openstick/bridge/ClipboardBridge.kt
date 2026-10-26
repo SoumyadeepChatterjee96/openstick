@@ -26,7 +26,14 @@ class ClipboardBridge(
         private const val MAX_CLIP_TEXT_LEN = 1024 * 1024 // 1 MB limit
     }
 
-    private val clipDir = File(rootfsDir, "tmp/.openstick-clip")
+    private val tmpDir: File = if (rootfsDir.name == "tmp") {
+        rootfsDir
+    } else if (File(rootfsDir.parentFile, "tmp").exists()) {
+        File(rootfsDir.parentFile, "tmp")
+    } else {
+        File(rootfsDir, "tmp")
+    }
+    private val clipDir = File(tmpDir, ".openstick-clip")
     private val toAndroidDir = File(clipDir, "to-android")
     private val toLinuxFile = File(clipDir, "to-linux")
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -75,6 +82,7 @@ class ClipboardBridge(
 
         obs.startWatching()
         observer = obs
+        importFromLinux()
     }
 
     fun stop() {
@@ -117,8 +125,12 @@ class ClipboardBridge(
         executor.execute {
             try {
                 val clipFile = File(toAndroidDir, "clip.txt")
-                if (!clipFile.exists()) return@execute
-                val text = clipFile.readText()
+                val clipJson = File(toAndroidDir, "clip.json")
+                val text = when {
+                    clipFile.exists() -> clipFile.readText()
+                    clipJson.exists() -> clipJson.readText()
+                    else -> return@execute
+                }
                 if (text.isEmpty() || text == lastOfferText || text == lastImportText) return@execute
                 lastImportText = text
 

@@ -173,7 +173,7 @@ fun MonitorScreen(
                             text = "$procCount active",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isNearLimit) Color(0xFFFFB300) else Color.White
+                            color = if (isNearLimit) Color(0xFFFFB300) else palette.text
                         )
                         Text(
                             text = "Android limit: 32 max",
@@ -196,7 +196,7 @@ fun MonitorScreen(
                             text = "%.1f GB free".format(s.freeStorageGb),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = palette.text
                         )
                         Text(
                             text = "%.1f GB total device".format(s.totalStorageGb),
@@ -224,7 +224,7 @@ fun MonitorScreen(
                     text = "Process Viewer",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = palette.text
                 )
 
                 OutlinedTextField(

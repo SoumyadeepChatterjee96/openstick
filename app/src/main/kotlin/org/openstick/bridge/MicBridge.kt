@@ -30,7 +30,14 @@ class MicBridge(
         private const val ENCODING = AudioFormat.ENCODING_PCM_16BIT
     }
 
-    private val fifo = File(rootfsDir, "tmp/openstick-mic.fifo")
+    private val tmpDir: File = if (rootfsDir.name == "tmp") {
+        rootfsDir
+    } else if (File(rootfsDir.parentFile, "tmp").exists()) {
+        File(rootfsDir.parentFile, "tmp")
+    } else {
+        File(rootfsDir, "tmp")
+    }
+    private val fifo = File(tmpDir, "openstick-mic.fifo")
     private var job: Job? = null
     @Volatile
     private var running = false

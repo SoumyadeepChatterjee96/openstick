@@ -216,6 +216,9 @@ fun HomeScreen(
             ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
         }
     }
+    val legacyStorageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        hasStoragePermission = granted
+    }
 
     if (!isInstalled) {
         SetupWizard(
@@ -658,7 +661,7 @@ fun HomeScreen(
                                 storageLauncher.launch(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
                             }
                         } else {
-                            micLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+                            legacyStorageLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
                         }
                     }
                 )

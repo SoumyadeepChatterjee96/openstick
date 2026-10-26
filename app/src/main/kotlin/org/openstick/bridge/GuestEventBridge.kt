@@ -12,6 +12,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.net.MailTo
 import org.openstick.MainActivity
+import org.openstick.R
 import java.io.File
 import kotlin.random.Random
 
@@ -33,7 +34,13 @@ class GuestEventBridge(
         const val OPEN_BSL_FILE = ".bsl-open"
     }
 
-    private val tmpDir = File(rootfsDir, "tmp")
+    private val tmpDir: File = if (rootfsDir.name == "tmp") {
+        rootfsDir
+    } else if (File(rootfsDir.parentFile, "tmp").exists()) {
+        File(rootfsDir.parentFile, "tmp")
+    } else {
+        File(rootfsDir, "tmp")
+    }
     private var observer: FileObserver? = null
     private val sessionSalt = Random.nextInt() and 0x7FFFFFFF
 
@@ -151,7 +158,7 @@ class GuestEventBridge(
         val content = body.ifBlank { summary }
 
         val notif = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(content)
             .setStyle(NotificationCompat.BigTextStyle().bigText(content))

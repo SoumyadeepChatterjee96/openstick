@@ -30,7 +30,14 @@ class PrintBridge(
         private const val TAG = "PrintBridge"
     }
 
-    private val spoolDir = File(rootfsDir, "tmp/openstick-print")
+    private val tmpDir: File = if (rootfsDir.name == "tmp") {
+        rootfsDir
+    } else if (File(rootfsDir.parentFile, "tmp").exists()) {
+        File(rootfsDir.parentFile, "tmp")
+    } else {
+        File(rootfsDir, "tmp")
+    }
+    private val spoolDir = File(tmpDir, "openstick-print")
     private val mainHandler = Handler(Looper.getMainLooper())
     private var observer: FileObserver? = null
 

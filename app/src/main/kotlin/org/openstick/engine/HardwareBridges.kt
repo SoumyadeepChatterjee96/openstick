@@ -347,7 +347,7 @@ object HardwareBridges {
     }
 
     /**
-     * Installs wrapper shims for xdg-open and notify-send inside Debian rootfs.
+     * Installs wrapper shims for xdg-open, notify-send, clipboard, and printing inside Debian rootfs.
      */
     private fun installGuestShims(rootfsDir: File) {
         val binDir = File(rootfsDir, "usr/local/bin")
@@ -368,7 +368,7 @@ object HardwareBridges {
             notifyScript.setExecutable(true, false)
         }
 
-        // xdg-open shim
+        // xdg-open & open shims
         val openScript = File(binDir, "xdg-open")
         if (!openScript.exists()) {
             openScript.writeText(
@@ -378,6 +378,68 @@ object HardwareBridges {
                 """.trimIndent() + "\n"
             )
             openScript.setExecutable(true, false)
+        }
+
+        val macOpenScript = File(binDir, "open")
+        if (!macOpenScript.exists()) {
+            macOpenScript.writeText(
+                """
+                #!/bin/sh
+                exec xdg-open "${'$'}@"
+                """.trimIndent() + "\n"
+            )
+            macOpenScript.setExecutable(true, false)
+        }
+
+        // CLI Clipboard copy shims (pbcopy & clip-copy)
+        val clipCopyBody = """
+            #!/bin/sh
+            mkdir -p /tmp/.openstick-clip/to-android
+            cat > /tmp/.openstick-clip/to-android/clip.txt
+        """.trimIndent() + "\n"
+
+        listOf("pbcopy", "clip-copy").forEach { cmdName ->
+            val script = File(binDir, cmdName)
+            if (!script.exists()) {
+                script.writeText(clipCopyBody)
+                script.setExecutable(true, false)
+            }
+        }
+
+        // CLI Clipboard paste shims (pbpaste & clip-paste)
+        val clipPasteBody = """
+            #!/bin/sh
+            if [ -f /tmp/.openstick-clip/to-linux ]; then
+                cat /tmp/.openstick-clip/to-linux
+            fi
+        """.trimIndent() + "\n"
+
+        listOf("pbpaste", "clip-paste").forEach { cmdName ->
+            val script = File(binDir, cmdName)
+            if (!script.exists()) {
+                script.writeText(clipPasteBody)
+                script.setExecutable(true, false)
+            }
+        }
+
+        // Printing shims (print & lpr)
+        val printBody = """
+            #!/bin/sh
+            if [ -z "${'$'}1" ]; then
+                echo "Usage: ${'$'}0 <file.pdf>"
+                exit 1
+            fi
+            mkdir -p /tmp/openstick-print
+            cp -f "${'$'}1" "/tmp/openstick-print/${'$'}(basename "${'$'}1")"
+            echo "Document sent to Android print manager"
+        """.trimIndent() + "\n"
+
+        listOf("print", "lpr").forEach { cmdName ->
+            val script = File(binDir, cmdName)
+            if (!script.exists()) {
+                script.writeText(printBody)
+                script.setExecutable(true, false)
+            }
         }
     }
 }

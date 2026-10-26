@@ -377,6 +377,8 @@ fun InteractiveTerminalPane(
 ) {
     val listState = rememberLazyListState()
     val snapshot = tab.snapshot
+    val palette = LocalOpenStickPalette.current
+    val termBg = if (palette.isDark) palette.background else Color(0xFF181818)
     var inputFieldValue by remember { mutableStateOf(TextFieldValue("")) }
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -391,7 +393,7 @@ fun InteractiveTerminalPane(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(termBg)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null

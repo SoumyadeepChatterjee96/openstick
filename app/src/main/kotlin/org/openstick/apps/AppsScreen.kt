@@ -378,6 +378,12 @@ fun AppsScreen(
                 )
             },
             text = {
+                val logScrollState = rememberScrollState()
+                LaunchedEffect(actionLog) {
+                    if (logScrollState.maxValue > 0) {
+                        logScrollState.animateScrollTo(logScrollState.maxValue)
+                    }
+                }
                 Column(modifier = Modifier.fillMaxWidth()) {
                     if (isActionRunning) {
                         LinearProgressIndicator(
@@ -403,7 +409,7 @@ fun AppsScreen(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(10.dp)
-                                .verticalScroll(rememberScrollState(Int.MAX_VALUE))
+                                .verticalScroll(logScrollState)
                         )
                     }
                 }

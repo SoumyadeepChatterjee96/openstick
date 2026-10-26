@@ -120,10 +120,16 @@ class AudioBridge(
 
     private fun isBufferSilent(buf: ByteArray, len: Int): Boolean {
         var i = 0
-        while (i < len) {
-            val sample = (buf[i].toInt() and 0xFF) or (buf[i + 1].toInt() shl 8)
-            if (sample > 300 || sample < -300) {
+        while (i + 1 < len) {
+            val sampleLeft = (buf[i].toInt() and 0xFF) or (buf[i + 1].toInt() shl 8)
+            if (sampleLeft > 300 || sampleLeft < -300) {
                 return false
+            }
+            if (i + 3 < len) {
+                val sampleRight = (buf[i + 2].toInt() and 0xFF) or (buf[i + 3].toInt() shl 8)
+                if (sampleRight > 300 || sampleRight < -300) {
+                    return false
+                }
             }
             i += 4 // 16-bit stereo = 4 bytes per frame
         }
