@@ -36,6 +36,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.focus.FocusRequester
+import org.openstick.terminal.TerminalTab
+import org.openstick.terminal.InteractiveTerminalPane
 import io.breadstick.x11.LorieView
 import io.breadstick.x11.X11Server
 import kotlinx.coroutines.Dispatchers
@@ -201,14 +204,29 @@ fun DesktopScreen(
                                 desktopStatus = "Starting X11 server..."
                                 x11Server.start { success ->
                                     isX11Running = success
-                                    desktopStatus = if (success) "X11 listening on :0" else "Failed to start X11"
-                                    if (success) showSurface = true
+                                    if (success) {
+                                        showSurface = true
+                                        desktopStatus = "X11 :0 Ready • Launching Desktop..."
+                                        scope.launch {
+                                            runner.start(
+                                                command = listOf(
+                                                    "/bin/sh",
+                                                    "-c",
+                                                    "DISPLAY=:0 startxfce4 --disable-tcp 2>&1 || ((sleep 1; DISPLAY=:0 xfce4-terminal 2>/dev/null || DISPLAY=:0 xterm 2>/dev/null &); DISPLAY=:0 exec openbox)"
+                                                ),
+                                                onOutput = { desktopStatus = "Desktop session active" }
+                                            )
+                                        }
+                                    } else {
+                                        desktopStatus = "Failed to start X11 server"
+                                    }
                                 }
                             } else {
+                                runner.kill()
                                 x11Server.stop()
                                 isX11Running = false
                                 showSurface = false
-                                desktopStatus = "X11 server stopped"
+                                desktopStatus = "X11 server standby"
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -440,9 +458,10 @@ fun DesktopScreen(
                         scope.launch {
                             if (!isX11Running) x11Server.start { isX11Running = it }
                             showSurface = true
-                            desktopStatus = "Starting XFCE4..."
+                            desktopStatus = "Starting XFCE4 Desktop..."
+                            runner.kill()
                             runner.start(
-                                command = listOf("/bin/sh", "-c", "DISPLAY=:0 startxfce4 || DISPLAY=:0 xfce4-session"),
+                                command = listOf("/bin/sh", "-c", "DISPLAY=:0 exec startxfce4 --disable-tcp 2>&1"),
                                 onOutput = { desktopStatus = "XFCE session active" }
                             )
                         }
@@ -458,9 +477,14 @@ fun DesktopScreen(
                         scope.launch {
                             if (!isX11Running) x11Server.start { isX11Running = it }
                             showSurface = true
-                            desktopStatus = "Starting Openbox..."
+                            desktopStatus = "Starting Openbox + Terminal..."
+                            runner.kill()
                             runner.start(
-                                command = listOf("/bin/sh", "-c", "DISPLAY=:0 openbox"),
+                                command = listOf(
+                                    "/bin/sh",
+                                    "-c",
+                                    "(sleep 1; DISPLAY=:0 xfce4-terminal 2>/dev/null || DISPLAY=:0 xterm 2>/dev/null &); DISPLAY=:0 exec openbox"
+                                ),
                                 onOutput = { desktopStatus = "Openbox active" }
                             )
                         }
@@ -477,15 +501,19 @@ fun DesktopScreen(
                             if (!isX11Running) x11Server.start { isX11Running = it }
                             showSurface = true
                             runner.start(
-                                command = listOf("/bin/sh", "-c", "DISPLAY=:0 chromium --no-sandbox || DISPLAY=:0 firefox-esr || DISPLAY=:0 xterm"),
-                                onOutput = { desktopStatus = "Browser launched" }
+                                command = listOf(
+                                    "/bin/sh",
+                                    "-c",
+                                    "DISPLAY=:0 xfce4-terminal 2>/dev/null || DISPLAY=:0 xterm 2>/dev/null"
+                                ),
+                                onOutput = { desktopStatus = "X11 Terminal launched" }
                             )
                         }
                     },
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
                 ) {
-                    Text("Browser", fontSize = 12.sp)
+                    Text("Terminal", fontSize = 12.sp)
                 }
 
                 OutlinedButton(
@@ -494,7 +522,11 @@ fun DesktopScreen(
                             if (!isX11Running) x11Server.start { isX11Running = it }
                             showSurface = true
                             runner.start(
-                                command = listOf("/bin/sh", "-c", "DISPLAY=:0 code --no-sandbox || DISPLAY=:0 gimp || DISPLAY=:0 xfce4-terminal"),
+                                command = listOf(
+                                    "/bin/sh",
+                                    "-c",
+                                    "DISPLAY=:0 chromium --no-sandbox || DISPLAY=:0 firefox-esr || DISPLAY=:0 xfce4-appfinder || DISPLAY=:0 xfce4-terminal"
+                                ),
                                 onOutput = { desktopStatus = "App launched" }
                             )
                         }
@@ -749,44 +781,34 @@ private fun MiniFloatingWindow(
 @Composable
 private fun MiniTerminalView(env: LinuxEnvironment) {
     val scope = rememberCoroutineScope()
-    var outputText by remember { mutableStateOf("OpenStick Terminal Shell ready.\n") }
-    var commandText by remember { mutableStateOf("") }
-    val runner = remember {
-        ProotRunner(env, scope).apply {
-            start(
-                onOutput = { newText ->
-                    val clean = newText.replace(Regex("\u001B\\[[;?0-9]*[a-zA-Z]"), "")
-                    outputText += clean
-                    if (outputText.length > 8000) {
-                        outputText = outputText.takeLast(5000)
-                    }
-                }
-            )
-        }
+    val focusRequester = remember { FocusRequester() }
+    val tab = remember {
+        TerminalTab(
+            id = "mini-term",
+            title = "Shell",
+            env = env,
+            scope = scope
+        ).apply { start() }
     }
 
     DisposableEffect(Unit) {
-        onDispose { runner.stop() }
+        onDispose { tab.stop() }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(6.dp)
-        ) {
-            Text(
-                text = outputText,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 11.sp,
-                color = Color(0xFF00FF66),
-                lineHeight = 15.sp
+        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            InteractiveTerminalPane(
+                tab = tab,
+                fontSize = 11,
+                focusRequester = focusRequester,
+                ctrlActive = false,
+                altActive = false,
+                onConsumeCtrl = {},
+                onConsumeAlt = {}
             )
         }
 
-        // Key shortcuts
+        // Mini Quick Key Row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -795,51 +817,25 @@ private fun MiniTerminalView(env: LinuxEnvironment) {
                 .padding(horizontal = 4.dp, vertical = 2.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            val keys = listOf("ESC" to "\u001b", "TAB" to "\t", "CTRL+C" to "\u0003", "CTRL+D" to "\u0004", "UP" to "\u001b[A", "DOWN" to "\u001b[B")
+            val keys = listOf(
+                "ESC" to "\u001b",
+                "TAB" to "\t",
+                "CTRL+C" to "\u0003",
+                "CTRL+D" to "\u0004",
+                "↑" to "\u001b[A",
+                "↓" to "\u001b[B"
+            )
             keys.forEach { (label, code) ->
                 FilledTonalButton(
-                    onClick = { runner.write(code) },
+                    onClick = {
+                        tab.write(code)
+                        focusRequester.requestFocus()
+                    },
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
                     modifier = Modifier.height(24.dp)
                 ) {
                     Text(label, fontSize = 9.sp)
                 }
-            }
-        }
-
-        // Input
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF161616))
-                .padding(4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = commandText,
-                onValueChange = { commandText = it },
-                modifier = Modifier.weight(1f).height(38.dp),
-                placeholder = { Text("Command...", fontSize = 11.sp) },
-                singleLine = true,
-                textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = Color.White),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = {
-                    if (commandText.isNotEmpty()) {
-                        runner.write("$commandText\n")
-                        commandText = ""
-                    }
-                })
-            )
-            IconButton(
-                onClick = {
-                    if (commandText.isNotEmpty()) {
-                        runner.write("$commandText\n")
-                        commandText = ""
-                    }
-                },
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(Icons.Default.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
             }
         }
     }

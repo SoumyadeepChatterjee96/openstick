@@ -1,28 +1,44 @@
 package org.openstick.terminal
 
+import android.view.KeyEvent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.PictureInPicture
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Splitscreen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import org.openstick.ui.theme.AmoledBackground
 import org.openstick.ui.theme.AmoledBorder
 import org.openstick.ui.theme.AmoledContainer
@@ -32,7 +48,8 @@ fun TerminalScreen(
     manager: TerminalSessionManager,
     modifier: Modifier = Modifier
 ) {
-    var commandText by remember { mutableStateOf("") }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusRequester = remember { FocusRequester() }
 
     Column(
         modifier = modifier
@@ -56,7 +73,10 @@ fun TerminalScreen(
                     val isActive = index == manager.activeTabIndex
                     FilterChip(
                         selected = isActive,
-                        onClick = { manager.activeTabIndex = index },
+                        onClick = {
+                            manager.activeTabIndex = index
+                            focusRequester.requestFocus()
+                        },
                         label = { Text(tab.title, fontSize = 12.sp) },
                         trailingIcon = {
                             if (manager.tabs.size > 1) {
@@ -85,7 +105,10 @@ fun TerminalScreen(
 
             // New Tab button
             IconButton(
-                onClick = { manager.createTab() },
+                onClick = {
+                    manager.createTab()
+                    focusRequester.requestFocus()
+                },
                 modifier = Modifier.size(32.dp)
             ) {
                 Icon(Icons.Default.Add, contentDescription = "New Tab", tint = MaterialTheme.colorScheme.primary)
@@ -112,7 +135,7 @@ fun TerminalScreen(
 
         HorizontalDivider(color = AmoledBorder, thickness = 1.dp)
 
-        // Terminal Output Viewport
+        // Terminal Interactive Viewport
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -121,7 +144,15 @@ fun TerminalScreen(
             when (manager.splitMode) {
                 SplitMode.SINGLE -> {
                     manager.activeTab?.let { tab ->
-                        TerminalPane(tab = tab, fontSize = manager.fontSize)
+                        InteractiveTerminalPane(
+                            tab = tab,
+                            fontSize = manager.fontSize,
+                            focusRequester = focusRequester,
+                            ctrlActive = manager.ctrlActive,
+                            altActive = manager.altActive,
+                            onConsumeCtrl = { manager.ctrlActive = false },
+                            onConsumeAlt = { manager.altActive = false }
+                        )
                     }
                 }
                 SplitMode.HORIZONTAL -> {
@@ -130,11 +161,31 @@ fun TerminalScreen(
                         val secondTab = manager.tabs.getOrNull(1) ?: firstTab
 
                         Box(modifier = Modifier.weight(1f)) {
-                            firstTab?.let { TerminalPane(tab = it, fontSize = manager.fontSize) }
+                            firstTab?.let {
+                                InteractiveTerminalPane(
+                                    tab = it,
+                                    fontSize = manager.fontSize,
+                                    focusRequester = focusRequester,
+                                    ctrlActive = manager.ctrlActive,
+                                    altActive = manager.altActive,
+                                    onConsumeCtrl = { manager.ctrlActive = false },
+                                    onConsumeAlt = { manager.altActive = false }
+                                )
+                            }
                         }
                         Divider(modifier = Modifier.fillMaxHeight().width(1.dp), color = AmoledBorder)
                         Box(modifier = Modifier.weight(1f)) {
-                            secondTab?.let { TerminalPane(tab = it, fontSize = manager.fontSize) }
+                            secondTab?.let {
+                                InteractiveTerminalPane(
+                                    tab = it,
+                                    fontSize = manager.fontSize,
+                                    focusRequester = focusRequester,
+                                    ctrlActive = manager.ctrlActive,
+                                    altActive = manager.altActive,
+                                    onConsumeCtrl = { manager.ctrlActive = false },
+                                    onConsumeAlt = { manager.altActive = false }
+                                )
+                            }
                         }
                     }
                 }
@@ -144,132 +195,274 @@ fun TerminalScreen(
                         val secondTab = manager.tabs.getOrNull(1) ?: firstTab
 
                         Box(modifier = Modifier.weight(1f)) {
-                            firstTab?.let { TerminalPane(tab = it, fontSize = manager.fontSize) }
+                            firstTab?.let {
+                                InteractiveTerminalPane(
+                                    tab = it,
+                                    fontSize = manager.fontSize,
+                                    focusRequester = focusRequester,
+                                    ctrlActive = manager.ctrlActive,
+                                    altActive = manager.altActive,
+                                    onConsumeCtrl = { manager.ctrlActive = false },
+                                    onConsumeAlt = { manager.altActive = false }
+                                )
+                            }
                         }
                         Divider(modifier = Modifier.fillMaxWidth().height(1.dp), color = AmoledBorder)
                         Box(modifier = Modifier.weight(1f)) {
-                            secondTab?.let { TerminalPane(tab = it, fontSize = manager.fontSize) }
+                            secondTab?.let {
+                                InteractiveTerminalPane(
+                                    tab = it,
+                                    fontSize = manager.fontSize,
+                                    focusRequester = focusRequester,
+                                    ctrlActive = manager.ctrlActive,
+                                    altActive = manager.altActive,
+                                    onConsumeCtrl = { manager.ctrlActive = false },
+                                    onConsumeAlt = { manager.altActive = false }
+                                )
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Mobile Shortcut Keys Bar
+        // Mobile Quick-Key Toolbar (Pure Termux / Breadstick Style)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(AmoledContainer)
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 4.dp, vertical = 2.dp)
-        ) {
-            val shortcuts = listOf(
-                "ESC", "TAB", "CTRL+C", "CTRL+D", "CTRL+L",
-                "|", "-", "/", "~", "^", "$",
-                "UP", "DOWN", "LEFT", "RIGHT"
-            )
-            for (key in shortcuts) {
-                Button(
-                    onClick = { manager.sendKey(key) },
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                    shape = RoundedCornerShape(4.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF1E1E1E),
-                        contentColor = Color(0xFFEDE9E4)
-                    ),
-                    modifier = Modifier
-                        .height(30.dp)
-                        .padding(horizontal = 2.dp)
-                ) {
-                    val label = when (key) {
-                        "UP" -> "↑"
-                        "DOWN" -> "↓"
-                        "LEFT" -> "←"
-                        "RIGHT" -> "→"
-                        else -> key
-                    }
-                    Text(label, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                }
-            }
-        }
-
-        // Command Input Field
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(AmoledBackground)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+                .padding(horizontal = 4.dp, vertical = 3.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            OutlinedTextField(
-                value = commandText,
-                onValueChange = { commandText = it },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp),
-                placeholder = { Text("Command...", fontSize = 13.sp) },
-                singleLine = true,
-                textStyle = LocalTextStyle.current.copy(
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 13.sp
-                ),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = {
-                    if (commandText.isNotEmpty()) {
-                        manager.sendInput("$commandText\n")
-                        commandText = ""
-                    }
-                }),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = AmoledBorder,
-                    focusedTextColor = Color(0xFFEDE9E4),
-                    unfocusedTextColor = Color(0xFFEDE9E4)
-                )
+            // Modifiers
+            ModifierKeyButton(
+                label = "CTRL",
+                isActive = manager.ctrlActive,
+                onClick = { manager.ctrlActive = !manager.ctrlActive }
+            )
+            ModifierKeyButton(
+                label = "ALT",
+                isActive = manager.altActive,
+                onClick = { manager.altActive = !manager.altActive }
             )
 
-            Spacer(modifier = Modifier.width(6.dp))
+            // Essential terminal keys
+            QuickKeyButton("ESC") { manager.sendKey("ESC"); focusRequester.requestFocus() }
+            QuickKeyButton("TAB") { manager.sendKey("TAB"); focusRequester.requestFocus() }
 
-            IconButton(
-                onClick = {
-                    if (commandText.isNotEmpty()) {
-                        manager.sendInput("$commandText\n")
-                        commandText = ""
-                    }
-                },
-                modifier = Modifier.size(44.dp)
-            ) {
-                Icon(Icons.Default.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
-            }
+            // Common shell symbols
+            QuickKeyButton("/") { manager.sendInput("/"); focusRequester.requestFocus() }
+            QuickKeyButton("-") { manager.sendInput("-"); focusRequester.requestFocus() }
+            QuickKeyButton("|") { manager.sendInput("|"); focusRequester.requestFocus() }
+            QuickKeyButton("~") { manager.sendInput("~"); focusRequester.requestFocus() }
+
+            // Cursor Navigation
+            QuickKeyButton("↑") { manager.sendKey("UP"); focusRequester.requestFocus() }
+            QuickKeyButton("↓") { manager.sendKey("DOWN"); focusRequester.requestFocus() }
+            QuickKeyButton("←") { manager.sendKey("LEFT"); focusRequester.requestFocus() }
+            QuickKeyButton("→") { manager.sendKey("RIGHT"); focusRequester.requestFocus() }
+
+            // Shortcuts
+            QuickKeyButton("CTRL+C") { manager.sendKey("CTRL+C"); focusRequester.requestFocus() }
+            QuickKeyButton("CTRL+D") { manager.sendKey("CTRL+D"); focusRequester.requestFocus() }
+            QuickKeyButton("CTRL+L") { manager.sendKey("CTRL+L"); focusRequester.requestFocus() }
         }
     }
 }
 
 @Composable
-fun TerminalPane(
-    tab: TerminalTab,
-    fontSize: Int,
-    modifier: Modifier = Modifier
+private fun ModifierKeyButton(
+    label: String,
+    isActive: Boolean,
+    onClick: () -> Unit
 ) {
-    val scrollState = rememberScrollState()
-
-    LaunchedEffect(tab.outputText) {
-        scrollState.animateScrollTo(scrollState.maxValue)
-    }
-
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color(0xFF000000))
-            .padding(8.dp)
-            .verticalScroll(scrollState)
+    Button(
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+        shape = RoundedCornerShape(6.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (isActive) MaterialTheme.colorScheme.primary else Color(0xFF262626),
+            contentColor = if (isActive) MaterialTheme.colorScheme.onPrimary else Color(0xFFEDE9E4)
+        ),
+        modifier = Modifier.height(32.dp)
     ) {
         Text(
-            text = if (tab.outputText.isEmpty()) "OpenStick Linux Terminal ready.\nType a command or use shortcuts below.\n" else tab.outputText,
-            color = Color(0xFF00FF66), // Retro matrix / terminal green on pure black
-            fontFamily = FontFamily.Monospace,
-            fontSize = fontSize.sp,
-            lineHeight = (fontSize + 5).sp
+            text = label,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
+        )
+    }
+}
+
+@Composable
+private fun QuickKeyButton(
+    label: String,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+        shape = RoundedCornerShape(6.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFF1E1E1E),
+            contentColor = Color(0xFFEDE9E4)
+        ),
+        modifier = Modifier.height(32.dp)
+    ) {
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            fontFamily = FontFamily.Monospace
+        )
+    }
+}
+
+@Composable
+fun InteractiveTerminalPane(
+    tab: TerminalTab,
+    fontSize: Int,
+    focusRequester: FocusRequester,
+    ctrlActive: Boolean,
+    altActive: Boolean,
+    onConsumeCtrl: () -> Unit,
+    onConsumeAlt: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val listState = rememberLazyListState()
+    val snapshot = tab.snapshot
+    var inputFieldValue by remember { mutableStateOf(TextFieldValue("")) }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    // Keep scrolled to bottom on new output if user was already at bottom
+    LaunchedEffect(snapshot.screen.size, snapshot.scrollback.size) {
+        val totalCount = snapshot.scrollback.size + snapshot.screen.size
+        if (totalCount > 0) {
+            listState.scrollToItem(totalCount - 1)
+        }
+    }
+
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                focusRequester.requestFocus()
+                keyboardController?.show()
+            }
+    ) {
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val charWidthPx = with(density) { (fontSize * 0.62f).sp.toPx() }
+        val charHeightPx = with(density) { (fontSize * 1.35f).sp.toPx() }
+
+        // Automatically inform emulator of viewport column / row geometry
+        LaunchedEffect(maxWidth, maxHeight) {
+            val calcCols = (constraints.maxWidth / charWidthPx).toInt().coerceIn(20, 240)
+            val calcRows = (constraints.maxHeight / charHeightPx).toInt().coerceIn(10, 100)
+            tab.resize(calcCols, calcRows)
+        }
+
+        // Real ANSI Screen Rendering via LazyColumn
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 4.dp, vertical = 2.dp)
+        ) {
+            // Scrollback history
+            items(snapshot.scrollback) { line ->
+                Text(
+                    text = line,
+                    style = TextStyle(
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = fontSize.sp,
+                        lineHeight = (fontSize * 1.35f).sp,
+                        color = Color(0xFFE0E0E0)
+                    )
+                )
+            }
+            // Active screen lines
+            items(snapshot.screen) { line ->
+                Text(
+                    text = line,
+                    style = TextStyle(
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = fontSize.sp,
+                        lineHeight = (fontSize * 1.35f).sp,
+                        color = Color(0xFFE0E0E0)
+                    )
+                )
+            }
+        }
+
+        // Invisible soft-keyboard input capture field
+        BasicTextField(
+            value = inputFieldValue,
+            onValueChange = { newValue ->
+                val oldText = inputFieldValue.text
+                val newText = newValue.text
+                val delta = if (newText.length > oldText.length && newText.startsWith(oldText)) {
+                    newText.substring(oldText.length)
+                } else if (newText == oldText) {
+                    ""
+                } else if (newText.length < oldText.length) {
+                    val deletedCount = oldText.length - newText.length
+                    repeat(deletedCount) {
+                        tab.write(byteArrayOf(127)) // Backspace DEL
+                    }
+                    ""
+                } else {
+                    newText
+                }
+
+                if (delta.isNotEmpty()) {
+                    if (delta == "\n" || delta == "\r\n") {
+                        tab.write(byteArrayOf(13))
+                    } else {
+                        val mods = TerminalKeys.Mods(ctrl = ctrlActive, alt = altActive)
+                        if (ctrlActive) onConsumeCtrl()
+                        if (altActive) onConsumeAlt()
+                        tab.write(TerminalKeys.text(delta, mods))
+                    }
+                }
+
+                inputFieldValue = if (newText.length > 256) {
+                    TextFieldValue("", TextRange.Zero)
+                } else {
+                    newValue.copy(selection = TextRange(newText.length))
+                }
+            },
+            modifier = Modifier
+                .size(1.dp)
+                .alpha(0.01f)
+                .focusRequester(focusRequester)
+                .onKeyEvent { keyEvent ->
+                    if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_DOWN) {
+                        val bytes = TerminalKeys.toBytes(keyEvent.nativeKeyEvent, tab.emulator.applicationCursorKeys)
+                        if (bytes != null) {
+                            tab.write(bytes)
+                            return@onKeyEvent true
+                        }
+                    }
+                    false
+                },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.None,
+                autoCorrectEnabled = false
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = { tab.write(byteArrayOf(13)) },
+                onGo = { tab.write(byteArrayOf(13)) },
+                onSend = { tab.write(byteArrayOf(13)) }
+            ),
+            cursorBrush = SolidColor(Color.Transparent),
+            textStyle = TextStyle(color = Color.Transparent)
         )
     }
 }

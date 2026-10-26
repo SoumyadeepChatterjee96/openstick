@@ -107,4 +107,19 @@ class ProotRunner(
             } catch (_: Exception) {}
         }
     }
+
+    fun kill() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                process?.destroyForcibly()
+            } catch (_: Exception) {}
+            try {
+                // Kill any orphaned proot processes
+                Runtime.getRuntime().exec(arrayOf("sh", "-c", "killall -9 proot 2>/dev/null || true")).waitFor()
+            } catch (_: Exception) {}
+            _isRunning.value = false
+            process = null
+            stdin = null
+        }
+    }
 }
