@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -21,22 +22,29 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
-import androidx.compose.ui.focus.FocusRequester
+import java.io.File
 import org.openstick.terminal.TerminalTab
 import org.openstick.terminal.InteractiveTerminalPane
 import io.breadstick.x11.LorieView
@@ -101,6 +109,17 @@ fun DesktopScreen(
     var displayMode by remember { mutableStateOf(if (initialWindowed) DesktopDisplayMode.WINDOWED_MODE else DesktopDisplayMode.FULL_DESKTOP) }
     var desktopStatus by remember { mutableStateOf("Desktop ready") }
     var showSurface by remember { mutableStateOf(false) }
+
+    // Desktop View & Input State
+    var lorieViewRef by remember { mutableStateOf<LorieView?>(null) }
+    var isKeyboardVisible by remember { mutableStateOf(false) }
+    var ctrlHeld by remember { mutableStateOf(false) }
+    var altHeld by remember { mutableStateOf(false) }
+    var lastTapX by remember { mutableFloatStateOf(500f) }
+    var lastTapY by remember { mutableFloatStateOf(400f) }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusRequester = remember { FocusRequester() }
+    var inputFieldValue by remember { mutableStateOf(TextFieldValue("")) }
 
     // Windowed Mini Floating Windows list
     var nextZIndex by remember { mutableFloatStateOf(2f) }
@@ -456,12 +475,23 @@ fun DesktopScreen(
                 FilledTonalButton(
                     onClick = {
                         scope.launch {
+                            try {
+                                File(env.tmpDir, ".X0-lock").delete()
+                                File(env.tmpDir, ".X11-unix/X0").delete()
+                                File(env.rootfsDir, "tmp/.X0-lock").delete()
+                                File(env.rootfsDir, "tmp/.X11-unix/X0").delete()
+                            } catch (_: Exception) {}
+
                             if (!isX11Running) x11Server.start { isX11Running = it }
                             showSurface = true
                             desktopStatus = "Starting XFCE4 Desktop..."
                             runner.kill()
                             runner.start(
-                                command = listOf("/bin/sh", "-c", "DISPLAY=:0 exec startxfce4 --disable-tcp 2>&1"),
+                                command = listOf(
+                                    "/bin/sh",
+                                    "-c",
+                                    "export DISPLAY=:0; eval $(dbus-launch --sh-syntax 2>/dev/null); exec startxfce4 --disable-tcp 2>&1"
+                                ),
                                 onOutput = { desktopStatus = "XFCE session active" }
                             )
                         }
@@ -475,6 +505,13 @@ fun DesktopScreen(
                 FilledTonalButton(
                     onClick = {
                         scope.launch {
+                            try {
+                                File(env.tmpDir, ".X0-lock").delete()
+                                File(env.tmpDir, ".X11-unix/X0").delete()
+                                File(env.rootfsDir, "tmp/.X0-lock").delete()
+                                File(env.rootfsDir, "tmp/.X11-unix/X0").delete()
+                            } catch (_: Exception) {}
+
                             if (!isX11Running) x11Server.start { isX11Running = it }
                             showSurface = true
                             desktopStatus = "Starting Openbox + Terminal..."
@@ -483,7 +520,7 @@ fun DesktopScreen(
                                 command = listOf(
                                     "/bin/sh",
                                     "-c",
-                                    "(sleep 1; DISPLAY=:0 xfce4-terminal 2>/dev/null || DISPLAY=:0 xterm 2>/dev/null &); DISPLAY=:0 exec openbox"
+                                    "export DISPLAY=:0; eval $(dbus-launch --sh-syntax 2>/dev/null); (sleep 1; xfce4-terminal 2>/dev/null || xterm 2>/dev/null &); exec openbox"
                                 ),
                                 onOutput = { desktopStatus = "Openbox active" }
                             )
@@ -540,7 +577,7 @@ fun DesktopScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Fullscreen Surface Viewport
+            // Fullscreen Surface Viewport with Floating Input Controls
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -549,42 +586,215 @@ fun DesktopScreen(
                 shape = RoundedCornerShape(12.dp)
             ) {
                 if (showSurface && isX11Running) {
-                    AndroidView(
-                        factory = { context ->
-                            LorieView(context).apply {
-                                try {
-                                    val fd = x11Server.openRenderFd()
-                                    if (fd >= 0) {
-                                        connectAsync(fd)
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        // 1. Soft Keyboard Invisible Capture
+                        BasicTextField(
+                            value = inputFieldValue,
+                            onValueChange = { newValue ->
+                                val oldText = inputFieldValue.text
+                                val newText = newValue.text
+                                val delta = if (newText.length > oldText.length && newText.startsWith(oldText)) {
+                                    newText.substring(oldText.length)
+                                } else if (newText.length < oldText.length) {
+                                    val deletedCount = oldText.length - newText.length
+                                    repeat(deletedCount) {
+                                        lorieViewRef?.sendKeyEvent(14, 67, true, 0)
+                                        lorieViewRef?.sendKeyEvent(14, 67, false, 0)
                                     }
-                                } catch (e: Throwable) {
-                                    android.util.Log.e("DesktopScreen", "Failed to connect LorieView to X11", e)
+                                    ""
+                                } else {
+                                    newText
                                 }
-                                setOnTouchListener { _, event ->
-                                    sendTouchEvent(
-                                        event.actionMasked,
-                                        event.getPointerId(event.actionIndex),
-                                        event.x.toInt(),
-                                        event.y.toInt()
-                                    )
-                                    true
+
+                                if (delta.isNotEmpty()) {
+                                    if (delta == "\n" || delta == "\r\n") {
+                                        lorieViewRef?.sendKeyEvent(28, 66, true, 0)
+                                        lorieViewRef?.sendKeyEvent(28, 66, false, 0)
+                                    } else {
+                                        lorieViewRef?.sendTextEvent(delta.toByteArray(Charsets.UTF_8))
+                                    }
                                 }
-                                setOnGenericMotionListener { _, event ->
-                                    if (event.isFromSource(android.view.InputDevice.SOURCE_MOUSE)) {
-                                        sendMouseEvent(
-                                            event.x,
-                                            event.y,
-                                            event.buttonState,
-                                            event.action == MotionEvent.ACTION_DOWN,
-                                            false
+                                inputFieldValue = newValue.copy(selection = androidx.compose.ui.text.TextRange(newText.length))
+                            },
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Password,
+                                imeAction = ImeAction.None,
+                                autoCorrect = false
+                            ),
+                            modifier = Modifier
+                                .size(1.dp)
+                                .alpha(0.01f)
+                                .focusRequester(focusRequester),
+                            cursorBrush = SolidColor(Color.Transparent)
+                        )
+
+                        // 2. Gesture-enabled LorieView
+                        var twoFingerDownTime by remember { mutableLongStateOf(0L) }
+                        var isTwoFingerScrolling by remember { mutableStateOf(false) }
+                        var lastTwoFingerY by remember { mutableFloatStateOf(0f) }
+
+                        AndroidView(
+                            factory = { context ->
+                                LorieView(context).apply {
+                                    lorieViewRef = this
+                                    try {
+                                        val fd = x11Server.openRenderFd()
+                                        if (fd >= 0) {
+                                            connectAsync(fd)
+                                        }
+                                    } catch (e: Throwable) {
+                                        android.util.Log.e("DesktopScreen", "Failed to connect LorieView to X11", e)
+                                    }
+                                    setOnTouchListener { _, event ->
+                                        lastTapX = event.x
+                                        lastTapY = event.y
+
+                                        val pointerCount = event.pointerCount
+                                        when (event.actionMasked) {
+                                            MotionEvent.ACTION_POINTER_DOWN -> {
+                                                if (pointerCount == 2) {
+                                                    twoFingerDownTime = System.currentTimeMillis()
+                                                    isTwoFingerScrolling = false
+                                                    lastTwoFingerY = (event.getY(0) + event.getY(1)) / 2f
+                                                }
+                                            }
+                                            MotionEvent.ACTION_POINTER_UP -> {
+                                                if (pointerCount == 2 && !isTwoFingerScrolling) {
+                                                    val duration = System.currentTimeMillis() - twoFingerDownTime
+                                                    if (duration < 350) {
+                                                        // 2-finger tap -> Right Click!
+                                                        val tapX = (event.getX(0) + event.getX(1)) / 2f
+                                                        val tapY = (event.getY(0) + event.getY(1)) / 2f
+                                                        sendMouseEvent(tapX, tapY, 3, true, false)
+                                                        sendMouseEvent(tapX, tapY, 3, false, false)
+                                                        return@setOnTouchListener true
+                                                    }
+                                                }
+                                            }
+                                            MotionEvent.ACTION_MOVE -> {
+                                                if (pointerCount == 2) {
+                                                    val currentY = (event.getY(0) + event.getY(1)) / 2f
+                                                    val deltaY = currentY - lastTwoFingerY
+                                                    if (kotlin.math.abs(deltaY) > 15) {
+                                                        isTwoFingerScrolling = true
+                                                        // Mouse Wheel scroll
+                                                        sendMouseEvent(0f, -deltaY * 5f, 4, false, true)
+                                                        lastTwoFingerY = currentY
+                                                        return@setOnTouchListener true
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        sendTouchEvent(
+                                            event.actionMasked,
+                                            event.getPointerId(event.actionIndex),
+                                            event.x.toInt(),
+                                            event.y.toInt()
                                         )
                                         true
-                                    } else false
+                                    }
+                                    setOnGenericMotionListener { _, event ->
+                                        if (event.isFromSource(android.view.InputDevice.SOURCE_MOUSE)) {
+                                            sendMouseEvent(
+                                                event.x,
+                                                event.y,
+                                                event.buttonState,
+                                                event.action == MotionEvent.ACTION_DOWN,
+                                                false
+                                            )
+                                            true
+                                        } else false
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+
+                        // 3. Floating Quick Input Toolbar
+                        Card(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 8.dp)
+                                .height(44.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xEE141414)),
+                            shape = RoundedCornerShape(22.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, AmoledContainerHigh)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .horizontalScroll(rememberScrollState())
+                                    .padding(horizontal = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                IconButton(
+                                    onClick = {
+                                        isKeyboardVisible = !isKeyboardVisible
+                                        if (isKeyboardVisible) {
+                                            focusRequester.requestFocus()
+                                            keyboardController?.show()
+                                        } else {
+                                            keyboardController?.hide()
+                                        }
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Keyboard,
+                                        contentDescription = "Toggle Soft Keyboard",
+                                        tint = if (isKeyboardVisible) MaterialTheme.colorScheme.primary else Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+
+                                DesktopKeyChip("L") {
+                                    lorieViewRef?.sendMouseEvent(lastTapX, lastTapY, 1, true, false)
+                                    lorieViewRef?.sendMouseEvent(lastTapX, lastTapY, 1, false, false)
+                                }
+                                DesktopKeyChip("M") {
+                                    lorieViewRef?.sendMouseEvent(lastTapX, lastTapY, 2, true, false)
+                                    lorieViewRef?.sendMouseEvent(lastTapX, lastTapY, 2, false, false)
+                                }
+                                DesktopKeyChip("R") {
+                                    lorieViewRef?.sendMouseEvent(lastTapX, lastTapY, 3, true, false)
+                                    lorieViewRef?.sendMouseEvent(lastTapX, lastTapY, 3, false, false)
+                                }
+
+                                VerticalDivider(modifier = Modifier.height(18.dp), color = AmoledContainerHigh)
+
+                                DesktopKeyChip("ESC") {
+                                    lorieViewRef?.sendKeyEvent(1, 111, true, 0)
+                                    lorieViewRef?.sendKeyEvent(1, 111, false, 0)
+                                }
+                                DesktopKeyChip("TAB") {
+                                    lorieViewRef?.sendKeyEvent(15, 61, true, 0)
+                                    lorieViewRef?.sendKeyEvent(15, 61, false, 0)
+                                }
+                                DesktopKeyChip("CTRL", active = ctrlHeld) {
+                                    ctrlHeld = !ctrlHeld
+                                    lorieViewRef?.sendKeyEvent(29, 113, ctrlHeld, 0)
+                                }
+                                DesktopKeyChip("ALT", active = altHeld) {
+                                    altHeld = !altHeld
+                                    lorieViewRef?.sendKeyEvent(56, 57, altHeld, 0)
+                                }
+                                DesktopKeyChip("SUPER") {
+                                    lorieViewRef?.sendKeyEvent(125, 119, true, 0)
+                                    lorieViewRef?.sendKeyEvent(125, 119, false, 0)
+                                }
+                                DesktopKeyChip("↑") {
+                                    lorieViewRef?.sendKeyEvent(103, 19, true, 0)
+                                    lorieViewRef?.sendKeyEvent(103, 19, false, 0)
+                                }
+                                DesktopKeyChip("↓") {
+                                    lorieViewRef?.sendKeyEvent(108, 20, true, 0)
+                                    lorieViewRef?.sendKeyEvent(108, 20, false, 0)
                                 }
                             }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
+                        }
+                    }
                 } else {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -1022,4 +1232,30 @@ private fun MiniX11View(x11Server: X11Server) {
         },
         modifier = Modifier.fillMaxSize()
     )
+}
+
+@Composable
+private fun DesktopKeyChip(
+    label: String,
+    active: Boolean = false,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(8.dp),
+        color = if (active) MaterialTheme.colorScheme.primary else AmoledContainer,
+        modifier = Modifier.height(28.dp)
+    ) {
+        Box(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (active) MaterialTheme.colorScheme.onPrimary else Color.White
+            )
+        }
+    }
 }

@@ -149,6 +149,47 @@ fun SetupWizard(
                 }
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Storage Check Indicator
+            val stat = remember { android.os.StatFs(env.context.filesDir.path) }
+            val availableGb = remember { (stat.availableBlocksLong * stat.blockSizeLong) / (1024.0 * 1024.0 * 1024.0) }
+            val hasEnoughSpace = availableGb >= 1.5
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (hasEnoughSpace) Color(0xFF1B5E20).copy(alpha = 0.3f) else MaterialTheme.colorScheme.errorContainer
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (hasEnoughSpace) Icons.Default.CheckCircle else Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = if (hasEnoughSpace) Color(0xFF00FF66) else MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "Storage Space: " + String.format(java.util.Locale.US, "%.2f GB available", availableGb),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp,
+                            color = Color.White
+                        )
+                        Text(
+                            text = if (hasEnoughSpace) "Adequate storage available for Debian rootfs installation." else "Warning: Less than 1.5 GB available. Installation may fail due to low disk space.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(20.dp))
 
             if (errorMessage != null) {

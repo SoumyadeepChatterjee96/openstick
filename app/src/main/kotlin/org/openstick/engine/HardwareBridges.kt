@@ -1,14 +1,14 @@
 package org.openstick.engine
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
-import androidx.core.app.NotificationCompat
+import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import org.openstick.bridge.*
 import java.io.File
 
 object HardwareBridges {
-    private const val NOTIF_CHANNEL_ID = "openstick_guest_notifs"
+    private const val TAG = "HardwareBridges"
 
     var cameraBridgeEnabled = true
     var micBridgeEnabled = true
@@ -22,21 +22,7 @@ object HardwareBridges {
     var processLimit = 32
 
     fun applyDnsConfig(env: LinuxEnvironment, dnsChoice: String, customIp: String = "") {
-        val resolvConf = File(env.rootfsDir, "etc/resolv.conf")
-        resolvConf.parentFile?.mkdirs()
-
-        val dnsServers = when (dnsChoice) {
-            "Google" -> listOf("8.8.8.8", "8.8.4.4")
-            "Cloudflare" -> listOf("1.1.1.1", "1.0.0.1")
-            "OpenDNS" -> listOf("208.67.222.222", "208.67.220.220")
-            "Custom" -> listOf(customIp.ifEmpty { "1.1.1.1" })
-            else -> listOf("1.1.1.1", "8.8.8.8")
-        }
-
-        val content = dnsServers.joinToString("\n") { "nameserver $it" } + "\n"
-        try {
-            resolvConf.writeText(content)
-        } catch (_: Exception) {}
+        dnsBridge?.applyCurrentDns()
     }
 
     fun startSshServer(runner: ProotRunner) {
@@ -92,26 +78,155 @@ object HardwareBridges {
         )
     }
 
-    fun showGuestNotification(context: Context, title: String, text: String) {
-        if (!notificationBridgeEnabled) return
-        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+    // Active bridge instances
+    private var guestEventBridge: GuestEventBridge? = null
+    private var clipboardBridge: ClipboardBridge? = null
+    private var hostBridge: HostBridge? = null
+    private var dnsBridge: DnsBridge? = null
+    private var audioBridge: AudioBridge? = null
+    private var micBridge: MicBridge? = null
+    private var cameraBridge: CameraBridge? = null
+    private var calendarBridge: CalendarBridge? = null
+    private var printBridge: PrintBridge? = null
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                NOTIF_CHANNEL_ID,
-                "Linux Guest Notifications",
-                NotificationManager.IMPORTANCE_DEFAULT
-            )
-            manager.createNotificationChannel(channel)
+    /**
+     * Start all enabled background hardware and software bridges.
+     */
+    fun startAll(context: Context, env: LinuxEnvironment, scope: CoroutineScope) {
+        val rootfs = env.rootfsDir
+        if (!env.isInstalled()) return
+
+        installGuestShims(rootfs)
+
+        // 1. Dynamic DNS
+        try {
+            if (dnsBridge == null) {
+                dnsBridge = DnsBridge(context, rootfs).apply { start() }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting DnsBridge", e)
         }
 
-        val notif = NotificationCompat.Builder(context, NOTIF_CHANNEL_ID)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setAutoCancel(true)
-            .build()
+        // 2. Host Battery & Network Status
+        try {
+            if (hostBridge == null) {
+                hostBridge = HostBridge(context, rootfs).apply { start(scope) }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting HostBridge", e)
+        }
 
-        manager.notify((System.currentTimeMillis() % 100000).toInt(), notif)
+        // 3. Guest Notifications & URL Opener
+        try {
+            if (notificationBridgeEnabled && guestEventBridge == null) {
+                guestEventBridge = GuestEventBridge(context, rootfs).apply { start() }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting GuestEventBridge", e)
+        }
+
+        // 4. Two-Way Clipboard Bridge
+        try {
+            if (clipboardSyncEnabled && clipboardBridge == null) {
+                clipboardBridge = ClipboardBridge(context, rootfs).apply { start() }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting ClipboardBridge", e)
+        }
+
+        // 5. Audio Output Playback (PulseAudio TCP -> Android AudioTrack)
+        try {
+            if (audioOutputEnabled && audioBridge == null) {
+                audioBridge = AudioBridge().apply { start(scope) }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting AudioBridge", e)
+        }
+
+        // 6. Microphone Input (AudioRecord -> PulseAudio FIFO)
+        try {
+            if (micBridgeEnabled && micBridge == null) {
+                micBridge = MicBridge(context, rootfs).apply { start(scope) }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting MicBridge", e)
+        }
+
+        // 7. Camera (Camera2 MJPEG Server -> /run/openstick/camera)
+        try {
+            if (cameraBridgeEnabled && cameraBridge == null) {
+                cameraBridge = CameraBridge(context, rootfs).apply { start(scope) }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting CameraBridge", e)
+        }
+
+        // 8. Printing Spool Watcher
+        try {
+            if (printingBridgeEnabled && printBridge == null) {
+                printBridge = PrintBridge(context, rootfs).apply { start() }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting PrintBridge", e)
+        }
+
+        // 9. Calendar Sync
+        try {
+            if (calendarSyncEnabled && calendarBridge == null) {
+                calendarBridge = CalendarBridge(context, rootfs).apply { sync() }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error syncing CalendarBridge", e)
+        }
+    }
+
+    /**
+     * Stop all background bridges safely.
+     */
+    fun stopAll() {
+        try { dnsBridge?.stop(); dnsBridge = null } catch (_: Exception) {}
+        try { hostBridge?.stop(); hostBridge = null } catch (_: Exception) {}
+        try { guestEventBridge?.stop(); guestEventBridge = null } catch (_: Exception) {}
+        try { clipboardBridge?.stop(); clipboardBridge = null } catch (_: Exception) {}
+        try { audioBridge?.stop(); audioBridge = null } catch (_: Exception) {}
+        try { micBridge?.stop(); micBridge = null } catch (_: Exception) {}
+        try { cameraBridge?.stop(); cameraBridge = null } catch (_: Exception) {}
+        try { printBridge?.stop(); printBridge = null } catch (_: Exception) {}
+        calendarBridge = null
+    }
+
+    /**
+     * Installs wrapper shims for xdg-open and notify-send inside Debian rootfs.
+     */
+    private fun installGuestShims(rootfsDir: File) {
+        val binDir = File(rootfsDir, "usr/local/bin")
+        binDir.mkdirs()
+
+        // notify-send shim
+        val notifyScript = File(binDir, "notify-send")
+        if (!notifyScript.exists()) {
+            notifyScript.writeText(
+                """
+                #!/bin/sh
+                app="Linux"
+                summary="${'$'}1"
+                body="${'$'}2"
+                printf "%s\t%s\t%s\n" "${'$'}app" "${'$'}summary" "${'$'}body" >> /tmp/.openstick-notify 2>/dev/null || printf "%s\t%s\t%s\n" "${'$'}app" "${'$'}summary" "${'$'}body" >> /tmp/.bsl-notify
+                """.trimIndent() + "\n"
+            )
+            notifyScript.setExecutable(true, false)
+        }
+
+        // xdg-open shim
+        val openScript = File(binDir, "xdg-open")
+        if (!openScript.exists()) {
+            openScript.writeText(
+                """
+                #!/bin/sh
+                echo "${'$'}1" >> /tmp/.openstick-open 2>/dev/null || echo "${'$'}1" >> /tmp/.bsl-open
+                """.trimIndent() + "\n"
+            )
+            openScript.setExecutable(true, false)
+        }
     }
 }

@@ -167,8 +167,23 @@ fun AppsScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(filteredApps, key = { it.id }) { app ->
+                val binaryCandidates = when (app.id) {
+                    "chromium" -> listOf("chromium", "chromium-browser")
+                    "firefox" -> listOf("firefox-esr", "firefox")
+                    "vscode" -> listOf("code-oss", "code")
+                    "python" -> listOf("python3", "python")
+                    "build_essential" -> listOf("gcc", "g++", "make")
+                    else -> listOf(app.id, app.aptPackage.split(" ").first())
+                }
+                val isInstalled = binaryCandidates.any { bin ->
+                    File(env.rootfsDir, "usr/bin/$bin").exists() ||
+                    File(env.rootfsDir, "bin/$bin").exists() ||
+                    File(env.rootfsDir, "usr/local/bin/$bin").exists()
+                }
+
                 AppItemCard(
                     app = app,
+                    isInstalled = isInstalled,
                     onInstall = {
                         scope.launch {
                             isInstalling = true
@@ -185,6 +200,24 @@ fun AppsScreen(
                                 onOutput = { line -> installLog += "$line\n" }
                             )
                             installLog += "\nDone! ${app.name} is installed."
+                        }
+                    },
+                    onLaunch = {
+                        val launchExec = when (app.id) {
+                            "chromium" -> "chromium --no-sandbox"
+                            "firefox" -> "firefox-esr"
+                            "vscode" -> "code-oss"
+                            "python" -> "xterm -e python3"
+                            else -> app.id
+                        }
+                        scope.launch {
+                            runner.start(
+                                command = listOf(
+                                    "/bin/sh",
+                                    "-c",
+                                    "export DISPLAY=:0; eval $(dbus-launch --sh-syntax 2>/dev/null); (exec $launchExec 2>&1 &)"
+                                )
+                            )
                         }
                     }
                 )
@@ -239,7 +272,9 @@ fun AppsScreen(
 @Composable
 private fun AppItemCard(
     app: LinuxApp,
-    onInstall: () -> Unit
+    isInstalled: Boolean,
+    onInstall: () -> Unit,
+    onLaunch: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -278,14 +313,30 @@ private fun AppItemCard(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            Button(
-                onClick = onInstall,
-                shape = RoundedCornerShape(8.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Install", fontSize = 12.sp)
+            if (isInstalled) {
+                FilledTonalButton(
+                    onClick = onLaunch,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = Color(0xFF1B5E20),
+                        contentColor = Color.White
+                    ),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Launch", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            } else {
+                Button(
+                    onClick = onInstall,
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Install", fontSize = 12.sp)
+                }
             }
         }
     }

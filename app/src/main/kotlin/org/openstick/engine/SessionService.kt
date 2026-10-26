@@ -11,6 +11,10 @@ import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import org.openstick.MainActivity
 
 class SessionService : LifecycleService() {
@@ -34,6 +38,8 @@ class SessionService : LifecycleService() {
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
+    private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val env by lazy { LinuxEnvironment(this) }
 
     override fun onCreate() {
         super.onCreate()
@@ -44,10 +50,17 @@ class SessionService : LifecycleService() {
         val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
         wakeLock = powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "OpenStick:SessionWakeLock")
         wakeLock?.acquire(12 * 60 * 60 * 1000L) // 12 hours max
+
+        // Launch all hardware and software bridges
+        try {
+            HardwareBridges.startAll(this, env, serviceScope)
+        } catch (_: Exception) {}
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        serviceScope.cancel()
+        HardwareBridges.stopAll()
         if (wakeLock?.isHeld == true) {
             wakeLock?.release()
         }

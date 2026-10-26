@@ -1,7 +1,14 @@
 package org.openstick.home
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -22,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.launch
 import org.openstick.engine.HardwareBridges
 import org.openstick.engine.LinuxEnvironment
@@ -46,6 +54,64 @@ fun HomeScreen(
     var isInstalled by remember { mutableStateOf(env.isInstalled()) }
     var serviceActive by remember { mutableStateOf(false) }
     var actionMessage by remember { mutableStateOf("") }
+
+    var hasStoragePermission by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Environment.isExternalStorageManager()
+            } else {
+                ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+            }
+        )
+    }
+
+    var hasMicPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    var hasCamPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    var hasNotifPermission by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+        )
+    }
+
+    var hasCalPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        hasMicPermission = it
+    }
+    val camLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        hasCamPermission = it
+    }
+    val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        hasNotifPermission = it
+    }
+    val calLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        hasCalPermission = it
+    }
+    val storageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        hasStoragePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
+        } else {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        }
+    }
 
     if (!isInstalled) {
         SetupWizard(
@@ -172,8 +238,24 @@ fun HomeScreen(
                 DeviceAccessRow(
                     icon = Icons.Default.Folder,
                     title = "Device files",
-                    detail = "Shared storage mounted at /mnt/sdcard",
-                    status = "Available"
+                    detail = "Shared storage mounted at /mnt/sdcard and /sdcard",
+                    status = if (hasStoragePermission) "Allowed" else "Tap to Allow",
+                    isAllowed = hasStoragePermission,
+                    onClick = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            try {
+                                val intent = Intent(
+                                    Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                    Uri.parse("package:" + context.packageName)
+                                )
+                                storageLauncher.launch(intent)
+                            } catch (_: Exception) {
+                                storageLauncher.launch(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+                            }
+                        } else {
+                            micLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+                        }
+                    }
                 )
                 HorizontalDivider(color = AmoledContainerHigh, modifier = Modifier.padding(vertical = 10.dp))
 
@@ -181,15 +263,19 @@ fun HomeScreen(
                     icon = Icons.Default.Mic,
                     title = "Microphone",
                     detail = "Audio input piped through PulseAudio bridge",
-                    status = "Active"
+                    status = if (hasMicPermission) "Active" else "Tap to Allow",
+                    isAllowed = hasMicPermission,
+                    onClick = { micLauncher.launch(Manifest.permission.RECORD_AUDIO) }
                 )
                 HorizontalDivider(color = AmoledContainerHigh, modifier = Modifier.padding(vertical = 10.dp))
 
                 DeviceAccessRow(
                     icon = Icons.Default.PhotoCamera,
                     title = "Camera",
-                    detail = "Hardware video stream at /run/bsl/camera",
-                    status = "Active"
+                    detail = "Hardware video stream at /run/openstick/camera",
+                    status = if (hasCamPermission) "Active" else "Tap to Allow",
+                    isAllowed = hasCamPermission,
+                    onClick = { camLauncher.launch(Manifest.permission.CAMERA) }
                 )
                 HorizontalDivider(color = AmoledContainerHigh, modifier = Modifier.padding(vertical = 10.dp))
 
@@ -197,7 +283,9 @@ fun HomeScreen(
                     icon = Icons.Default.Event,
                     title = "Calendar",
                     detail = "Android calendar synchronization into guest",
-                    status = "Synced"
+                    status = if (hasCalPermission) "Synced" else "Tap to Allow",
+                    isAllowed = hasCalPermission,
+                    onClick = { calLauncher.launch(Manifest.permission.READ_CALENDAR) }
                 )
                 HorizontalDivider(color = AmoledContainerHigh, modifier = Modifier.padding(vertical = 10.dp))
 
@@ -205,7 +293,13 @@ fun HomeScreen(
                     icon = Icons.Default.Notifications,
                     title = "Android notifications",
                     detail = "Bidirectional notify-send desktop notification bridge",
-                    status = "Active"
+                    status = if (hasNotifPermission) "Active" else "Tap to Allow",
+                    isAllowed = hasNotifPermission,
+                    onClick = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
                 )
                 HorizontalDivider(color = AmoledContainerHigh, modifier = Modifier.padding(vertical = 10.dp))
 
@@ -213,7 +307,9 @@ fun HomeScreen(
                     icon = Icons.Default.Print,
                     title = "Printing",
                     detail = "CUPS / PDF direct printer backend service",
-                    status = "Ready"
+                    status = "Ready",
+                    isAllowed = true,
+                    onClick = { actionMessage = "Printing bridge is active." }
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -515,16 +611,21 @@ private fun DeviceAccessRow(
     icon: ImageVector,
     title: String,
     detail: String,
-    status: String
+    status: String,
+    isAllowed: Boolean,
+    onClick: () -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = if (isAllowed) MaterialTheme.colorScheme.primary else Color(0xFFFFB300),
             modifier = Modifier.size(20.dp)
         )
         Spacer(modifier = Modifier.width(12.dp))
@@ -533,6 +634,18 @@ private fun DeviceAccessRow(
             Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
         }
         Spacer(modifier = Modifier.width(8.dp))
-        Text(status, style = MaterialTheme.typography.labelSmall, color = Color(0xFF00FF66))
+        Surface(
+            color = if (isAllowed) Color(0xFF1B5E20) else Color(0xFFE65100),
+            shape = RoundedCornerShape(6.dp)
+        ) {
+            Text(
+                text = status,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+            )
+        }
     }
 }

@@ -2,6 +2,7 @@ package org.openstick
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -15,6 +16,7 @@ import androidx.lifecycle.lifecycleScope
 import io.breadstick.x11.X11Server
 import org.openstick.apps.AppsScreen
 import org.openstick.desktop.DesktopScreen
+import org.openstick.engine.HardwareBridges
 import org.openstick.engine.LinuxEnvironment
 import org.openstick.engine.ProotRunner
 import org.openstick.engine.ResourceMonitor
@@ -52,10 +54,24 @@ class MainActivity : ComponentActivity() {
         val initialThemeOrdinal = prefs.getInt("theme_mode", AppThemeMode.AMOLED_BLACK.ordinal)
         val initialTheme = AppThemeMode.values().getOrElse(initialThemeOrdinal) { AppThemeMode.AMOLED_BLACK }
 
+        // Start hardware and software bridges
+        try {
+            HardwareBridges.startAll(this, env, lifecycleScope)
+        } catch (_: Exception) {}
+
         setContent {
             var currentTheme by remember { mutableStateOf(initialTheme) }
             var currentScreen by remember { mutableStateOf(Screen.HOME) }
             var desktopWindowedMode by remember { mutableStateOf(false) }
+
+            // Predictive Back gesture handler (minimizes instead of killing session)
+            BackHandler {
+                if (currentScreen != Screen.HOME) {
+                    currentScreen = Screen.HOME
+                } else {
+                    moveTaskToBack(true)
+                }
+            }
 
             OpenStickTheme(themeMode = currentTheme) {
                 Scaffold(

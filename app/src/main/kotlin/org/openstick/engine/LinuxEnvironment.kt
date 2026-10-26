@@ -188,6 +188,10 @@ class LinuxEnvironment(val context: Context) {
             if (externalStorage != null && externalStorage.canRead()) {
                 cmd.add("-b")
                 cmd.add("${externalStorage.absolutePath}:/mnt/android")
+                cmd.add("-b")
+                cmd.add("${externalStorage.absolutePath}:/mnt/sdcard")
+                cmd.add("-b")
+                cmd.add("${externalStorage.absolutePath}:/sdcard")
 
                 val downloadDir = File(externalStorage, "Download")
                 if (downloadDir.isDirectory) {
