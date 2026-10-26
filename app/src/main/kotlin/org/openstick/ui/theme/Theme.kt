@@ -19,57 +19,10 @@ enum class AppThemeMode {
     LIGHT
 }
 
-private val AmoledColorScheme = darkColorScheme(
-    primary = AmoledAccent,
-    onPrimary = AmoledOnAccent,
-    primaryContainer = AmoledContainerHigh,
-    onPrimaryContainer = AmoledText,
-    secondary = AmoledAccent,
-    onSecondary = AmoledOnAccent,
-    background = AmoledBackground,
-    onBackground = AmoledText,
-    surface = AmoledSurface,
-    onSurface = AmoledText,
-    surfaceVariant = AmoledContainer,
-    onSurfaceVariant = AmoledTextDim,
-    outline = AmoledBorder
-)
-
-private val DarkColorScheme = darkColorScheme(
-    primary = DarkAccent,
-    onPrimary = DarkOnAccent,
-    primaryContainer = DarkContainer,
-    onPrimaryContainer = DarkText,
-    secondary = DarkAccent,
-    onSecondary = DarkOnAccent,
-    background = DarkBackground,
-    onBackground = DarkText,
-    surface = DarkSurface,
-    onSurface = DarkText,
-    surfaceVariant = DarkContainer,
-    onSurfaceVariant = DarkTextDim,
-    outline = DarkBorder
-)
-
-private val LightColorScheme = lightColorScheme(
-    primary = LightAccent,
-    onPrimary = LightOnAccent,
-    primaryContainer = LightContainer,
-    onPrimaryContainer = LightText,
-    secondary = LightAccent,
-    onSecondary = LightOnAccent,
-    background = LightBackground,
-    onBackground = LightText,
-    surface = LightSurface,
-    onSurface = LightText,
-    surfaceVariant = LightContainer,
-    onSurfaceVariant = LightTextDim,
-    outline = LightBorder
-)
-
 @Composable
 fun OpenStickTheme(
     themeMode: AppThemeMode = AppThemeMode.AMOLED_BLACK,
+    accent: AppAccent = AppAccent.CYAN,
     content: @Composable () -> Unit
 ) {
     val darkTheme = when (themeMode) {
@@ -79,10 +32,58 @@ fun OpenStickTheme(
         AppThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
 
+    val amoledScheme = darkColorScheme(
+        primary = accent.color,
+        onPrimary = accent.onColor,
+        primaryContainer = AmoledContainerHigh,
+        onPrimaryContainer = AmoledText,
+        secondary = accent.color,
+        onSecondary = accent.onColor,
+        background = AmoledBackground,
+        onBackground = AmoledText,
+        surface = AmoledSurface,
+        onSurface = AmoledText,
+        surfaceVariant = AmoledContainer,
+        onSurfaceVariant = AmoledTextDim,
+        outline = AmoledBorder
+    )
+
+    val darkScheme = darkColorScheme(
+        primary = accent.color,
+        onPrimary = accent.onColor,
+        primaryContainer = DarkContainer,
+        onPrimaryContainer = DarkText,
+        secondary = accent.color,
+        onSecondary = accent.onColor,
+        background = DarkBackground,
+        onBackground = DarkText,
+        surface = DarkSurface,
+        onSurface = DarkText,
+        surfaceVariant = DarkContainer,
+        onSurfaceVariant = DarkTextDim,
+        outline = DarkBorder
+    )
+
+    val lightScheme = lightColorScheme(
+        primary = accent.color,
+        onPrimary = accent.onColor,
+        primaryContainer = LightContainer,
+        onPrimaryContainer = LightText,
+        secondary = accent.color,
+        onSecondary = accent.onColor,
+        background = LightBackground,
+        onBackground = LightText,
+        surface = LightSurface,
+        onSurface = LightText,
+        surfaceVariant = LightContainer,
+        onSurfaceVariant = LightTextDim,
+        outline = LightBorder
+    )
+
     val colorScheme = when {
-        themeMode == AppThemeMode.AMOLED_BLACK -> AmoledColorScheme
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+        themeMode == AppThemeMode.AMOLED_BLACK -> amoledScheme
+        darkTheme -> darkScheme
+        else -> lightScheme
     }
 
     val view = LocalView.current

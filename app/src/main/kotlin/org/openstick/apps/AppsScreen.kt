@@ -3,6 +3,7 @@ package org.openstick.apps
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,9 +29,7 @@ import kotlinx.coroutines.launch
 import org.openstick.engine.LinuxEnvironment
 import org.openstick.engine.ProotRunner
 import org.openstick.ui.WindowActivity
-import org.openstick.ui.theme.AmoledBackground
-import org.openstick.ui.theme.AmoledContainer
-import org.openstick.ui.theme.AmoledContainerHigh
+import org.openstick.ui.theme.*
 import java.io.File
 import java.io.FileOutputStream
 
@@ -101,46 +100,54 @@ fun AppsScreen(
             .background(AmoledBackground)
             .padding(16.dp)
     ) {
-        // App Header
+        // Compact Top Action Bar
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    text = "App Catalogue",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Text(
-                    text = "1-Click APT Linux Applications",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Text(
+                text = "1-Click App Catalogue",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
 
-            OutlinedButton(
+            Surface(
                 onClick = { debLauncher.launch(arrayOf("application/vnd.debian.binary-package", "application/octet-stream", "*/*")) },
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(14.dp),
+                color = AmoledGlassContainer,
+                border = BorderStroke(1.dp, AmoledGlassBorder),
+                modifier = Modifier.height(32.dp)
             ) {
-                Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Install .deb", fontSize = 12.sp)
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(Icons.Default.UploadFile, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp))
+                    Text("Install .deb", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         // Search Bar
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Search applications...") },
+            placeholder = { Text("Search applications...", fontSize = 13.sp) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) }
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = AmoledGlassBorder,
+                focusedContainerColor = AmoledGlassContainer,
+                unfocusedContainerColor = AmoledGlassContainer
+            ),
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
         )
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -177,6 +184,9 @@ fun AppsScreen(
         ) {
             items(filteredApps, key = { it.id }) { app ->
                 val binaryCandidates = when (app.id) {
+                    "docker" -> listOf("podman", "docker")
+                    "n8n" -> listOf("n8n")
+                    "nodered" -> listOf("node-red")
                     "chromium" -> listOf("chromium", "chromium-browser")
                     "firefox" -> listOf("firefox-esr", "firefox")
                     "vscode" -> listOf("code-oss", "code")
@@ -198,11 +208,12 @@ fun AppsScreen(
                             isInstalling = true
                             isRunningInstall = true
                             activeAppName = app.name
-                            installLog = "Starting APT installation for ${app.name}...\n"
+                            installLog = "Starting installation for ${app.name}...\n"
+                            val installScript = app.customInstallCmd ?: "export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y --no-install-recommends ${app.aptPackage}"
                             val cmd = listOf(
                                 "/bin/sh",
                                 "-c",
-                                "export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y --no-install-recommends ${app.aptPackage}"
+                                installScript
                             )
                             val exitCode = runner.executeOneShot(
                                 command = cmd,
@@ -218,7 +229,7 @@ fun AppsScreen(
                         }
                     },
                     onLaunch = {
-                        val launchExec = when (app.id) {
+                        val launchExec = app.customLaunchCmd ?: when (app.id) {
                             "chromium" -> "chromium --no-sandbox"
                             "firefox" -> "firefox-esr"
                             "vscode" -> "code-oss"
@@ -291,10 +302,11 @@ private fun AppItemCard(
     onInstall: () -> Unit,
     onLaunch: () -> Unit
 ) {
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = AmoledContainer),
-        shape = RoundedCornerShape(12.dp)
+        color = AmoledGlassContainer,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, AmoledGlassBorder)
     ) {
         Row(
             modifier = Modifier
@@ -305,7 +317,7 @@ private fun AppItemCard(
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .background(AmoledContainerHigh, shape = RoundedCornerShape(10.dp)),
+                    .background(AmoledGlassHigh, shape = RoundedCornerShape(14.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -323,7 +335,7 @@ private fun AppItemCard(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(app.description, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("apt: ${app.aptPackage}", fontSize = 10.sp, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace)
+                Text("package: ${app.aptPackage}", fontSize = 10.sp, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace)
             }
 
             Spacer(modifier = Modifier.width(8.dp))
@@ -331,11 +343,12 @@ private fun AppItemCard(
             if (isInstalled) {
                 FilledTonalButton(
                     onClick = onLaunch,
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = Color(0xFF1B5E20),
-                        contentColor = Color.White
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                        contentColor = MaterialTheme.colorScheme.primary
                     ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(14.dp))
@@ -345,7 +358,7 @@ private fun AppItemCard(
             } else {
                 Button(
                     onClick = onInstall,
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(14.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(14.dp))

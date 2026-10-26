@@ -1,5 +1,6 @@
 package org.openstick.monitor
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -29,6 +30,8 @@ import org.openstick.engine.SystemStats
 import org.openstick.ui.theme.AmoledBackground
 import org.openstick.ui.theme.AmoledContainer
 import org.openstick.ui.theme.AmoledContainerHigh
+import org.openstick.ui.theme.AmoledGlassBorder
+import org.openstick.ui.theme.AmoledGlassContainer
 
 @Composable
 fun MonitorScreen(
@@ -58,57 +61,68 @@ fun MonitorScreen(
             .background(AmoledBackground)
             .padding(16.dp)
     ) {
-        // Screen Header
+        // Compact Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Text(
-                    text = "Resource Monitor",
-                    style = MaterialTheme.typography.headlineMedium,
+                    text = "System Metrics",
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.primary
                 )
-                Text(
-                    text = "Real-time guest & host metrics",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color(0x331B5E20),
+                    border = BorderStroke(1.dp, Color(0xFF00E676))
+                ) {
+                    Text(
+                        text = "LIVE",
+                        color = Color(0xFF00E676),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.sp,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val context = androidx.compose.ui.platform.LocalContext.current
-                IconButton(
-                    onClick = {
-                        org.openstick.ui.WindowActivity.launch(
-                            context = context,
-                            mode = org.openstick.ui.WindowActivity.MODE_MONITOR,
-                            title = "Resource Monitor"
-                        )
-                    },
-                    modifier = Modifier.size(36.dp)
+
+            val context = androidx.compose.ui.platform.LocalContext.current
+            Surface(
+                onClick = {
+                    org.openstick.ui.WindowActivity.launch(
+                        context = context,
+                        mode = org.openstick.ui.WindowActivity.MODE_MONITOR,
+                        title = "Resource Monitor"
+                    )
+                },
+                shape = RoundedCornerShape(12.dp),
+                color = AmoledGlassContainer,
+                border = BorderStroke(1.dp, AmoledGlassBorder),
+                modifier = Modifier.height(30.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Icon(
                         Icons.Default.PictureInPicture,
                         contentDescription = "Pop-up Window",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(14.dp)
                     )
-                }
-                Spacer(modifier = Modifier.width(6.dp))
-                Badge(containerColor = Color(0xFF1B5E20)) {
-                    Text(
-                        text = "LIVE",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
+                    Text("Pop-up", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         stats?.let { s ->
             // Metric Cards Row
@@ -150,8 +164,9 @@ fun MonitorScreen(
 
                 Card(
                     modifier = Modifier.weight(1f),
-                    colors = CardDefaults.cardColors(containerColor = AmoledContainer),
-                    shape = RoundedCornerShape(12.dp)
+                    colors = CardDefaults.cardColors(containerColor = AmoledGlassContainer),
+                    border = BorderStroke(1.dp, AmoledGlassBorder),
+                    shape = RoundedCornerShape(18.dp)
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text("Linux Processes", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -172,8 +187,9 @@ fun MonitorScreen(
 
                 Card(
                     modifier = Modifier.weight(1f),
-                    colors = CardDefaults.cardColors(containerColor = AmoledContainer),
-                    shape = RoundedCornerShape(12.dp)
+                    colors = CardDefaults.cardColors(containerColor = AmoledGlassContainer),
+                    border = BorderStroke(1.dp, AmoledGlassBorder),
+                    shape = RoundedCornerShape(18.dp)
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text("Disk Storage", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -198,7 +214,7 @@ fun MonitorScreen(
                 Text(statusFeedback, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // Process Viewer Header
             Row(
@@ -208,7 +224,7 @@ fun MonitorScreen(
             ) {
                 Text(
                     text = "Process Viewer",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
@@ -221,7 +237,14 @@ fun MonitorScreen(
                         .width(180.dp)
                         .height(48.dp),
                     singleLine = true,
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    shape = RoundedCornerShape(14.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = AmoledGlassBorder,
+                        focusedContainerColor = AmoledGlassContainer,
+                        unfocusedContainerColor = AmoledGlassContainer
+                    ),
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) }
                 )
             }
 
@@ -236,8 +259,9 @@ fun MonitorScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                colors = CardDefaults.cardColors(containerColor = AmoledContainer),
-                shape = RoundedCornerShape(12.dp)
+                colors = CardDefaults.cardColors(containerColor = AmoledGlassContainer),
+                border = BorderStroke(1.dp, AmoledGlassBorder),
+                shape = RoundedCornerShape(18.dp)
             ) {
                 if (filteredProcs.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -280,8 +304,9 @@ private fun MetricCard(
 ) {
     Card(
         modifier = modifier.height(120.dp),
-        colors = CardDefaults.cardColors(containerColor = AmoledContainer),
-        shape = RoundedCornerShape(12.dp)
+        colors = CardDefaults.cardColors(containerColor = AmoledGlassContainer),
+        border = BorderStroke(1.dp, AmoledGlassBorder),
+        shape = RoundedCornerShape(18.dp)
     ) {
         Column(
             modifier = Modifier

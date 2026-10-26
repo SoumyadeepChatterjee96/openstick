@@ -40,10 +40,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.openstick.engine.*
-import org.openstick.ui.theme.AmoledBackground
-import org.openstick.ui.theme.AmoledContainer
-import org.openstick.ui.theme.AmoledContainerHigh
-import org.openstick.ui.theme.AppThemeMode
+import org.openstick.ui.theme.*
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -57,6 +54,8 @@ fun SettingsScreen(
     runner: ProotRunner,
     currentTheme: AppThemeMode,
     onThemeChange: (AppThemeMode) -> Unit,
+    currentAccent: AppAccent = AppAccent.CYAN,
+    onAccentChange: (AppAccent) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -276,18 +275,77 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        // Title
-        Text(
-            text = "Settings",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        )
-        Text(
-            text = "Hardware bridges, network, virtualization, and backup",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        // Compact Header with Quick Action Menu
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Preferences & Control Center",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Box {
+                var menuOpen by remember { mutableStateOf(false) }
+                IconButton(
+                    onClick = { menuOpen = true },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = "Quick Options",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuOpen,
+                    onDismissRequest = { menuOpen = false },
+                    modifier = Modifier
+                        .background(AmoledGlassHigh)
+                        .border(1.dp, AmoledGlassBorder, RoundedCornerShape(8.dp))
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Restart PulseAudio Server", color = Color.White, fontSize = 13.sp) },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.VolumeUp, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
+                        onClick = {
+                            menuOpen = false
+                            scope.launch {
+                                runner.executeOneShot(
+                                    command = listOf("/bin/sh", "-c", "pulseaudio -k 2>/dev/null; pulseaudio --start --exit-idle-time=-1 2>/dev/null || true"),
+                                    onOutput = { actionMessage = it }
+                                )
+                                actionMessage = "PulseAudio sound server restarted"
+                            }
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Clear Temporary Cache", color = Color.White, fontSize = 13.sp) },
+                        leadingIcon = { Icon(Icons.Default.DeleteSweep, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
+                        onClick = {
+                            menuOpen = false
+                            val count = env.tmpDir.listFiles()?.count { f ->
+                                if (!f.name.startsWith(".X11-unix")) f.deleteRecursively() else false
+                            } ?: 0
+                            actionMessage = "Cleaned $count temporary cache files"
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Reset Theme to AMOLED Cyan", color = Color.White, fontSize = 13.sp) },
+                        leadingIcon = { Icon(Icons.Default.Palette, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
+                        onClick = {
+                            menuOpen = false
+                            onThemeChange(AppThemeMode.AMOLED_BLACK)
+                            onAccentChange(AppAccent.CYAN)
+                            actionMessage = "Theme reset to AMOLED Pitch Black with Electric Cyan"
+                        }
+                    )
+                }
+            }
+        }
 
         if (actionMessage.isNotEmpty()) {
             Spacer(modifier = Modifier.height(12.dp))
@@ -311,7 +369,12 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Section 1: Display & Appearance
-        SettingsSection(title = "Display & Appearance", icon = Icons.Default.Palette) {
+        SettingsSection(
+            title = "Display & Appearance",
+            icon = Icons.Default.Palette,
+            summary = "${currentAccent.title} • ${selectedDpi} DPI",
+            initiallyExpanded = true
+        ) {
             Text("Application Theme", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
             Spacer(modifier = Modifier.height(6.dp))
 
@@ -496,15 +559,68 @@ fun SettingsScreen(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(14.dp))
+            Text("Accent Color Palette", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                for (accent in AppAccent.values()) {
+                    val isSelected = currentAccent == accent
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onAccentChange(accent) },
+                        color = if (isSelected) AmoledGlassHigh else AmoledGlassContainer,
+                        border = BorderStroke(
+                            width = if (isSelected) 2.dp else 1.dp,
+                            color = if (isSelected) accent.color else AmoledGlassBorder
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(vertical = 8.dp, horizontal = 2.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .clip(CircleShape)
+                                    .background(accent.color)
+                                    .border(
+                                        1.5.dp,
+                                        if (isSelected) Color.White else Color.Transparent,
+                                        CircleShape
+                                    )
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = accent.title.split(" ").first(),
+                                fontSize = 10.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) accent.color else Color.LightGray
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         // Section 2: Hardware Bridges
-        SettingsSection(title = "Hardware Bridges", icon = Icons.Default.Sensors) {
+        SettingsSection(
+            title = "Hardware Bridges",
+            icon = Icons.Default.Sensors,
+            summary = if (cameraEnabled || micEnabled) "Active" else "Standby",
+            initiallyExpanded = true
+        ) {
             SwitchRow(
                 title = "Camera Bridge",
-                subtitle = "Expose Android camera feed to guest Linux (/run/bsl/camera)",
+                subtitle = "Expose Android camera feed to guest Linux (/run/openstick/camera)",
                 checked = cameraEnabled,
                 onCheckedChange = { enable ->
                     if (enable) {
@@ -591,7 +707,7 @@ fun SettingsScreen(
             )
             SwitchRow(
                 title = "Calendar Sync",
-                subtitle = "Bridge Android device calendar events to /run/bsl/calendar",
+                subtitle = "Bridge Android device calendar events to /run/openstick/calendar",
                 checked = calendarEnabled,
                 onCheckedChange = { enable ->
                     if (enable) {
@@ -625,7 +741,7 @@ fun SettingsScreen(
             )
             SwitchRow(
                 title = "Printing Bridge",
-                subtitle = "CUPS / PDF direct printer backend service (/run/bsl/printing)",
+                subtitle = "CUPS / PDF direct printer backend service (/run/openstick/printing)",
                 checked = printingEnabled,
                 onCheckedChange = { enable ->
                     printingEnabled = enable
@@ -658,7 +774,12 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Section 3: Network & Remote Access
-        SettingsSection(title = "Network & Remote Access", icon = Icons.Default.Wifi) {
+        SettingsSection(
+            title = "Network & Remote Access",
+            icon = Icons.Default.Wifi,
+            summary = "$selectedDns • SSH ${if (sshEnabled) "2222" else "Off"}",
+            initiallyExpanded = false
+        ) {
             Text("DNS Server Configuration", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
             Spacer(modifier = Modifier.height(6.dp))
 
@@ -797,7 +918,12 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Section 4: Engine & Performance
-        SettingsSection(title = "Engine & Performance", icon = Icons.Default.Speed) {
+        SettingsSection(
+            title = "Engine & Performance",
+            icon = Icons.Default.Speed,
+            summary = if (gpuEnabled) "3D GPU On" else "Software",
+            initiallyExpanded = false
+        ) {
             SwitchRow(
                 title = "VirGL 3D GPU Acceleration",
                 subtitle = "Hardware 3D rendering bridge via virpipe/GLES socket",
@@ -851,7 +977,12 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Section 5: Maintenance & Recovery
-        SettingsSection(title = "Maintenance & Recovery", icon = Icons.Default.Build) {
+        SettingsSection(
+            title = "Maintenance & Recovery",
+            icon = Icons.Default.Build,
+            summary = "Repair & Cache",
+            initiallyExpanded = false
+        ) {
             OutlinedButton(
                 onClick = {
                     actionMessage = "Repairing packages with dpkg & apt-get -f install..."
@@ -901,7 +1032,12 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Section 6: Snapshots & Backup
-        SettingsSection(title = "Snapshots & Backup", icon = Icons.Default.Backup) {
+        SettingsSection(
+            title = "Snapshots & Backup",
+            icon = Icons.Default.Backup,
+            summary = ".tar.zst Backups",
+            initiallyExpanded = false
+        ) {
             Text(
                 text = "Create compressed .tar.zst image snapshots of your full Linux system for safe keeping or transfer.",
                 fontSize = 12.sp,
@@ -957,7 +1093,12 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Section 7: Danger Zone
-        SettingsSection(title = "Danger Zone", icon = Icons.Default.Warning) {
+        SettingsSection(
+            title = "Danger Zone",
+            icon = Icons.Default.Warning,
+            summary = "System Reset",
+            initiallyExpanded = false
+        ) {
             Text(
                 text = "Irreversible actions that modify or delete your containerized distribution.",
                 fontSize = 12.sp,
@@ -980,10 +1121,13 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Section 8: About
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = AmoledContainer),
-            shape = RoundedCornerShape(12.dp)
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp)),
+            color = AmoledGlassContainer,
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, AmoledGlassBorder)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
@@ -1041,21 +1185,65 @@ fun SettingsScreen(
 private fun SettingsSection(
     title: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
+    summary: String = "",
+    initiallyExpanded: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = AmoledContainer),
-        shape = RoundedCornerShape(12.dp)
+    var isExpanded by remember { mutableStateOf(initiallyExpanded) }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp)),
+        color = AmoledGlassContainer,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, AmoledGlassBorder)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { isExpanded = !isExpanded }
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    modifier = Modifier.weight(1f)
+                )
+                if (summary.isNotEmpty() && !isExpanded) {
+                    Text(
+                        text = summary,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .background(AmoledGlassHigh, RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Icon(
+                    if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    tint = Color.Gray,
+                    modifier = Modifier.size(20.dp)
+                )
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            content()
+            if (isExpanded) {
+                Spacer(modifier = Modifier.height(12.dp))
+                content()
+            }
         }
     }
 }

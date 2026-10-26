@@ -814,6 +814,26 @@ if [ -r /usr/lib/breadstick/apply-look.sh ] && command -v xfce4-session >/dev/nu
     [ "$U" = "root" ] || chown -R "$U" "$UHOME/.config" 2>/dev/null || true
 fi
 
+# OpenStick: optimize touch/mouse double-click (650ms, 36px) and window placement/drag
+if [ -d "$XFDIR" ]; then
+    if [ -f "$XFDIR/xsettings.xml" ]; then
+        sed -i 's#<property name="DoubleClickTime" type="int" value=".*"/>#<property name="DoubleClickTime" type="int" value="650"/>#' "$XFDIR/xsettings.xml" 2>/dev/null || true
+        grep -q 'name="DoubleClickDistance"' "$XFDIR/xsettings.xml" || sed -i '/name="DoubleClickTime"/a \    <property name="DoubleClickDistance" type="int" value="36"/>' "$XFDIR/xsettings.xml" 2>/dev/null || true
+    fi
+    if [ -f "$XFDIR/xfwm4.xml" ]; then
+        sed -i 's#<property name="placement_mode" type="string" value=".*"/>#<property name="placement_mode" type="string" value="center"/>#' "$XFDIR/xfwm4.xml" 2>/dev/null || true
+        grep -q 'name="placement_mode"' "$XFDIR/xfwm4.xml" || sed -i '/name="general"/a \    <property name="placement_mode" type="string" value="center"/>' "$XFDIR/xfwm4.xml" 2>/dev/null || true
+        grep -q 'name="easy_click"' "$XFDIR/xfwm4.xml" || sed -i '/name="general"/a \    <property name="easy_click" type="string" value="Alt"/>' "$XFDIR/xfwm4.xml" 2>/dev/null || true
+        grep -q 'name="double_click_time"' "$XFDIR/xfwm4.xml" || sed -i '/name="general"/a \    <property name="double_click_time" type="int" value="650"/>' "$XFDIR/xfwm4.xml" 2>/dev/null || true
+        grep -q 'name="double_click_distance"' "$XFDIR/xfwm4.xml" || sed -i '/name="general"/a \    <property name="double_click_distance" type="int" value="36"/>' "$XFDIR/xfwm4.xml" 2>/dev/null || true
+        grep -q 'name="titleless_maximize"' "$XFDIR/xfwm4.xml" && sed -i 's#<property name="titleless_maximize" type="bool" value=".*"/>#<property name="titleless_maximize" type="bool" value="false"/>#' "$XFDIR/xfwm4.xml" 2>/dev/null || true
+        grep -q 'name="borderless_maximize"' "$XFDIR/xfwm4.xml" && sed -i 's#<property name="borderless_maximize" type="bool" value=".*"/>#<property name="borderless_maximize" type="bool" value="false"/>#' "$XFDIR/xfwm4.xml" 2>/dev/null || true
+    fi
+    if [ -f "$XFDIR/thunar.xml" ]; then
+        sed -i 's#<property name="misc-single-click" type="bool" value=".*"/>#<property name="misc-single-click" type="bool" value="true"/>#' "$XFDIR/thunar.xml" 2>/dev/null || true
+    fi
+fi
+
 # Removable storage: SD cards and USB drives. The app binds each mounted volume at /mnt/<name>
 # (sd-card for a card Android describes as "SD card"). Nothing pointed at those, and the second
 # bind the app makes into the home folder under the volumes own label is what file managers listed

@@ -6,11 +6,42 @@ data class LinuxApp(
     val category: String,
     val description: String,
     val aptPackage: String,
-    val iconName: String
+    val iconName: String,
+    val customInstallCmd: String? = null,
+    val customLaunchCmd: String? = null
 )
 
 object AppCatalogue {
     val apps = listOf(
+        LinuxApp(
+            id = "docker",
+            name = "Docker & Podman",
+            category = "Development",
+            description = "Rootless container engine, Docker CLI, and docker-compose tools",
+            aptPackage = "podman podman-compose docker.io",
+            iconName = "terminal",
+            customLaunchCmd = "xterm -e 'echo OpenStick Container CLI; podman --version 2>/dev/null; docker --version 2>/dev/null; bash'"
+        ),
+        LinuxApp(
+            id = "n8n",
+            name = "n8n Automation",
+            category = "Development",
+            description = "Self-hosted fair-code workflow automation tool with 400+ integration nodes",
+            aptPackage = "nodejs npm python3 build-essential",
+            iconName = "code",
+            customInstallCmd = "export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y --no-install-recommends nodejs npm python3 build-essential && npm install -g --unsafe-perm n8n",
+            customLaunchCmd = "xterm -e 'echo Starting n8n server on localhost:5678...; n8n start'"
+        ),
+        LinuxApp(
+            id = "nodered",
+            name = "Node-RED",
+            category = "Development",
+            description = "Low-code visual event-driven flow programming for IoT and APIs",
+            aptPackage = "nodejs npm build-essential",
+            iconName = "code",
+            customInstallCmd = "export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y --no-install-recommends nodejs npm build-essential && npm install -g --unsafe-perm node-red",
+            customLaunchCmd = "xterm -e 'echo Starting Node-RED on localhost:1880...; node-red'"
+        ),
         LinuxApp(
             id = "chromium",
             name = "Chromium",

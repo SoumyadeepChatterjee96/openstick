@@ -14,6 +14,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -41,9 +42,7 @@ import org.openstick.engine.LinuxEnvironment
 import org.openstick.engine.ProotRunner
 import org.openstick.engine.SessionService
 import org.openstick.ui.WindowActivity
-import org.openstick.ui.theme.AmoledBackground
-import org.openstick.ui.theme.AmoledContainer
-import org.openstick.ui.theme.AmoledContainerHigh
+import org.openstick.ui.theme.*
 
 @Composable
 fun HomeScreen(
@@ -106,6 +105,7 @@ fun HomeScreen(
     var calBridgeEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_calendar", false)) }
     var notifBridgeEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_notif", false)) }
     var printingBridgeEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_printing", false)) }
+    var isDeviceAccessExpanded by remember { mutableStateOf(false) }
 
     // Sync bridge states on resume and on SharedPreferences changes
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -232,60 +232,67 @@ fun HomeScreen(
             .fillMaxSize()
             .background(AmoledBackground)
             .verticalScroll(rememberScrollState())
-            .padding(16.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        // App Header Bar
+        // Compact Status Badge Row
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "OpenStick",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Badge(
-                    containerColor = Color(0xFF1B5E20)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0x331B5E20),
+                    border = BorderStroke(1.dp, Color(0xFF00E676))
                 ) {
-                    Text(
-                        text = "Ready",
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Box(modifier = Modifier.size(6.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0xFF00E676)))
+                        Text(
+                            text = "PRoot Ready",
+                            color = Color(0xFF00E676),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                    }
                 }
+                Text(
+                    text = "User: ${env.getConfiguredUsername()}",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
-            Badge(containerColor = MaterialTheme.colorScheme.primaryContainer) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+            ) {
                 Text(
                     text = "100% FOSS",
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp
                 )
             }
         }
 
-        Text(
-            text = "User: ${env.getConfiguredUsername()} • Debian Container",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Spacer(modifier = Modifier.height(14.dp))
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Open Section (OpenStick 3-tile launch bar)
+        // Quick Launch Section
         Text(
-            text = "Open",
-            style = MaterialTheme.typography.titleMedium,
+            text = "Quick Launch",
+            style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
-            color = Color.White
+            color = MaterialTheme.colorScheme.primary
         )
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -296,7 +303,7 @@ fun HomeScreen(
             LaunchTile(
                 imageVector = Icons.Default.DesktopWindows,
                 title = "Desktop",
-                subtitle = "Full screen",
+                subtitle = "X11 GUI",
                 active = true,
                 modifier = Modifier.weight(1f),
                 onClick = onNavigateDesktop
@@ -305,7 +312,7 @@ fun HomeScreen(
             LaunchTile(
                 imageVector = Icons.Default.PictureInPicture,
                 title = "Floating",
-                subtitle = "Pop-up terminal",
+                subtitle = "Window",
                 active = false,
                 modifier = Modifier.weight(1f),
                 onClick = {
@@ -316,34 +323,93 @@ fun HomeScreen(
             LaunchTile(
                 imageVector = Icons.Default.Terminal,
                 title = "Terminal",
-                subtitle = "Shell only",
+                subtitle = "Shell",
                 active = false,
                 modifier = Modifier.weight(1f),
                 onClick = onNavigateTerminal
             )
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Device Access Section
-        Text(
-            text = "Device access",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        )
-        Spacer(modifier = Modifier.height(8.dp))
+        // Device Access Section (Collapsible Accordion Card)
+        val activeBridgesCount = (if (hasStoragePermission) 1 else 0) +
+                (if (hasMicPermission && micBridgeEnabled) 1 else 0) +
+                (if (hasCamPermission && camBridgeEnabled) 1 else 0) +
+                (if (hasCalPermission && calBridgeEnabled) 1 else 0) +
+                (if (hasNotifPermission && notifBridgeEnabled) 1 else 0) +
+                (if (printingBridgeEnabled) 1 else 0)
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = AmoledContainer),
-            shape = RoundedCornerShape(14.dp)
+            colors = CardDefaults.cardColors(containerColor = AmoledGlassContainer),
+            shape = RoundedCornerShape(18.dp),
+            border = BorderStroke(1.dp, AmoledGlassBorder)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
-                // Device files
-                val (filesStatus, filesState) = if (hasStoragePermission) {
-                    "Allowed" to BridgeState.ACTIVE
-                } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { isDeviceAccessExpanded = !isDeviceAccessExpanded },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Security,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "Device Access",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "$activeBridgesCount of 6 bridges active",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = { isDeviceAccessExpanded = !isDeviceAccessExpanded },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            if (isDeviceAccessExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Toggle Device Access",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                if (isDeviceAccessExpanded) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = AmoledBorder)
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Device files
+                    val (filesStatus, filesState) = if (hasStoragePermission) {
+                        "Allowed" to BridgeState.ACTIVE
+                    } else {
                     "Tap to Allow" to BridgeState.NEEDS_PERMISSION
                 }
                 DeviceAccessRow(
@@ -505,23 +571,17 @@ fun HomeScreen(
                 )
             }
         }
+    }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Apps Section
-        Text(
-            text = "Apps",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
         Card(
             onClick = onNavigateApps,
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = AmoledContainer),
-            shape = RoundedCornerShape(14.dp)
+            colors = CardDefaults.cardColors(containerColor = AmoledGlassContainer),
+            border = BorderStroke(1.dp, AmoledGlassBorder),
+            shape = RoundedCornerShape(18.dp)
         ) {
             Row(
                 modifier = Modifier
@@ -532,7 +592,7 @@ fun HomeScreen(
                 Box(
                     modifier = Modifier
                         .size(42.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -548,14 +608,14 @@ fun HomeScreen(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Recommended apps",
+                        text = "App Catalogue",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Development tools, browsers, office and graphics, installed in one tap.",
+                        text = "Docker, n8n, Node-RED, browsers, IDEs in 1 tap.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -564,27 +624,20 @@ fun HomeScreen(
                 Icon(
                     Icons.Default.ChevronRight,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         // Monitor Section
-        Text(
-            text = "Monitor",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
         Card(
             onClick = onNavigateMonitor,
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = AmoledContainer),
-            shape = RoundedCornerShape(14.dp)
+            colors = CardDefaults.cardColors(containerColor = AmoledGlassContainer),
+            border = BorderStroke(1.dp, AmoledGlassBorder),
+            shape = RoundedCornerShape(18.dp)
         ) {
             Row(
                 modifier = Modifier
@@ -595,7 +648,7 @@ fun HomeScreen(
                 Box(
                     modifier = Modifier
                         .size(42.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -611,14 +664,14 @@ fun HomeScreen(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Resource monitor",
+                        text = "Resource Monitor",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "CPU, memory, processes, power and temperature, live.",
+                        text = "Real-time CPU, RAM, disk, processes & temps.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -627,30 +680,30 @@ fun HomeScreen(
                 Icon(
                     Icons.Default.ChevronRight,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // Environment Section
-        Text(
-            text = "Environment",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
+        // Environment Backup & Maintenance Section
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = AmoledContainer),
-            shape = RoundedCornerShape(14.dp)
+            colors = CardDefaults.cardColors(containerColor = AmoledGlassContainer),
+            border = BorderStroke(1.dp, AmoledGlassBorder),
+            shape = RoundedCornerShape(18.dp)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Text(
-                    text = "Save your whole Linux setup to a file you keep, on this device or in your own cloud through the file picker.",
+                    text = "System Backup & Maintenance",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Save your whole Debian environment snapshot to external storage or cloud.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -754,9 +807,10 @@ private fun LaunchTile(
         onClick = onClick,
         modifier = modifier.height(105.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (active) MaterialTheme.colorScheme.primaryContainer else AmoledContainer
+            containerColor = if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else AmoledGlassContainer
         ),
-        shape = RoundedCornerShape(12.dp)
+        border = BorderStroke(1.dp, if (active) MaterialTheme.colorScheme.primary else AmoledGlassBorder),
+        shape = RoundedCornerShape(18.dp)
     ) {
         Column(
             modifier = Modifier
@@ -768,7 +822,7 @@ private fun LaunchTile(
             Icon(
                 imageVector = imageVector,
                 contentDescription = null,
-                tint = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(26.dp)
             )
             Spacer(modifier = Modifier.height(6.dp))
@@ -776,14 +830,14 @@ private fun LaunchTile(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = if (active) MaterialTheme.colorScheme.onPrimaryContainer else Color.White,
+                color = Color.White,
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.labelSmall,
-                color = if (active) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.9f) else MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 fontSize = 10.sp
             )

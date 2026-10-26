@@ -60,6 +60,8 @@ import org.openstick.engine.WebVncServer
 import org.openstick.ui.theme.AmoledBackground
 import org.openstick.ui.theme.AmoledContainer
 import org.openstick.ui.theme.AmoledContainerHigh
+import org.openstick.ui.theme.AmoledGlassBorder
+import org.openstick.ui.theme.AmoledGlassContainer
 import java.net.Inet4Address
 import java.net.NetworkInterface
 
@@ -215,6 +217,10 @@ fun DesktopScreen(
             var prevTouchY by remember { mutableFloatStateOf(0f) }
             var cursorX by remember { mutableFloatStateOf(540f) }
             var cursorY by remember { mutableFloatStateOf(1170f) }
+            var lastPhysicalMouseButton by remember { mutableIntStateOf(1) }
+            var lastTapUpTime by remember { mutableLongStateOf(0L) }
+            var lastTapUpX by remember { mutableFloatStateOf(0f) }
+            var lastTapUpY by remember { mutableFloatStateOf(0f) }
             var isDragging by remember { mutableStateOf(false) }
             var hasTriggeredLongPress by remember { mutableStateOf(false) }
             var longPressJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
@@ -243,17 +249,20 @@ fun DesktopScreen(
                                     event.buttonState and MotionEvent.BUTTON_PRIMARY != 0 -> 1
                                     event.buttonState and MotionEvent.BUTTON_SECONDARY != 0 -> 3
                                     event.buttonState and MotionEvent.BUTTON_TERTIARY != 0 -> 2
-                                    else -> 0
+                                    else -> lastPhysicalMouseButton
                                 }
                                 when (event.actionMasked) {
                                     MotionEvent.ACTION_DOWN, MotionEvent.ACTION_BUTTON_PRESS -> {
+                                        lastPhysicalMouseButton = button
                                         sendMouseEvent(event.x, event.y, button, true, false)
                                     }
                                     MotionEvent.ACTION_MOVE -> {
-                                        sendMouseEvent(event.x, event.y, button, button != 0, false)
+                                        val isDown = event.buttonState != 0
+                                        val btn = if (isDown) lastPhysicalMouseButton else 0
+                                        sendMouseEvent(event.x, event.y, btn, isDown, false)
                                     }
                                     MotionEvent.ACTION_UP, MotionEvent.ACTION_BUTTON_RELEASE -> {
-                                        sendMouseEvent(event.x, event.y, button, false, false)
+                                        sendMouseEvent(event.x, event.y, lastPhysicalMouseButton, false, false)
                                     }
                                 }
                                 return@setOnTouchListener true
@@ -273,10 +282,22 @@ fun DesktopScreen(
                                     hasTriggeredLongPress = false
 
                                     if (!isTrackpadMode) {
-                                        cursorX = event.x
-                                        cursorY = event.y
-                                        lastTapX = event.x
-                                        lastTapY = event.y
+                                        val now = System.currentTimeMillis()
+                                        val isDoubleTap = (now - lastTapUpTime < 450L) &&
+                                            (kotlin.math.hypot(event.x - lastTapUpX, event.y - lastTapUpY) < touchSlop * 2.5f)
+
+                                        if (isDoubleTap) {
+                                            // Snap to first tap coordinates to prevent motion jitter from breaking double clicks
+                                            cursorX = lastTapUpX
+                                            cursorY = lastTapUpY
+                                            lastTapX = lastTapUpX
+                                            lastTapY = lastTapUpY
+                                        } else {
+                                            cursorX = event.x
+                                            cursorY = event.y
+                                            lastTapX = event.x
+                                            lastTapY = event.y
+                                        }
                                         sendMouseEvent(cursorX, cursorY, 0, false, false)
 
                                         longPressJob?.cancel()
@@ -388,13 +409,21 @@ fun DesktopScreen(
                                                 sendMouseEvent(cursorX, cursorY, 1, false, false)
                                                 isDragging = false
                                             } else {
-                                                cursorX = event.x
-                                                cursorY = event.y
-                                                lastTapX = event.x
-                                                lastTapY = event.y
+                                                val now = System.currentTimeMillis()
+                                                val isDoubleTap = (now - lastTapUpTime < 450L) &&
+                                                    (kotlin.math.hypot(event.x - lastTapUpX, event.y - lastTapUpY) < touchSlop * 2.5f)
+                                                val clickX = if (isDoubleTap) lastTapUpX else event.x
+                                                val clickY = if (isDoubleTap) lastTapUpY else event.y
+                                                cursorX = clickX
+                                                cursorY = clickY
+                                                lastTapX = clickX
+                                                lastTapY = clickY
                                                 sendMouseEvent(cursorX, cursorY, 0, false, false)
                                                 sendMouseEvent(cursorX, cursorY, 1, true, false)
                                                 sendMouseEvent(cursorX, cursorY, 1, false, false)
+                                                lastTapUpTime = now
+                                                lastTapUpX = clickX
+                                                lastTapUpY = clickY
                                             }
                                         }
                                     }
@@ -454,8 +483,8 @@ fun DesktopScreen(
                     Surface(
                         onClick = { isToolbarExpanded = true },
                         shape = RoundedCornerShape(20.dp),
-                        color = Color(0xDD161616),
-                        border = BorderStroke(1.dp, AmoledContainerHigh),
+                        color = AmoledGlassContainer,
+                        border = BorderStroke(1.dp, AmoledGlassBorder),
                         shadowElevation = 8.dp,
                         modifier = Modifier.height(36.dp)
                     ) {
@@ -481,9 +510,9 @@ fun DesktopScreen(
                 } else {
                     // Expanded Floating Toolbar Pill
                     Surface(
-                        shape = RoundedCornerShape(24.dp),
-                        color = Color(0xEE141414),
-                        border = BorderStroke(1.dp, AmoledContainerHigh),
+                        shape = RoundedCornerShape(22.dp),
+                        color = AmoledGlassContainer,
+                        border = BorderStroke(1.dp, AmoledGlassBorder),
                         shadowElevation = 10.dp,
                         modifier = Modifier.height(44.dp)
                     ) {
@@ -585,6 +614,46 @@ fun DesktopScreen(
 
                             VerticalDivider(modifier = Modifier.height(18.dp).padding(horizontal = 2.dp), color = AmoledContainerHigh)
 
+                            // Window Management Controls (Un-stick, Maximize, Close)
+                            DesktopKeyChip("✕ Close") {
+                                scope.launch {
+                                    runner.executeOneShot(
+                                        command = listOf("/bin/sh", "-c", "DISPLAY=:0 wmctrl -c :ACTIVE: 2>/dev/null || DISPLAY=:0 xdotool getactivewindow windowkill 2>/dev/null"),
+                                        asRoot = false
+                                    )
+                                }
+                                lorieViewRef?.sendKeyEvent(56, 57, true, 0)
+                                lorieViewRef?.sendKeyEvent(62, 134, true, 0)
+                                lorieViewRef?.sendKeyEvent(62, 134, false, 0)
+                                lorieViewRef?.sendKeyEvent(56, 57, false, 0)
+                            }
+                            DesktopKeyChip("⤢ Max") {
+                                scope.launch {
+                                    runner.executeOneShot(
+                                        command = listOf("/bin/sh", "-c", "DISPLAY=:0 wmctrl -r :ACTIVE: -b toggle,maximized_vert,maximized_horz 2>/dev/null"),
+                                        asRoot = false
+                                    )
+                                }
+                            }
+                            DesktopKeyChip("⎚ Min") {
+                                scope.launch {
+                                    runner.executeOneShot(
+                                        command = listOf("/bin/sh", "-c", "DISPLAY=:0 wmctrl -r :ACTIVE: -b add,hidden 2>/dev/null"),
+                                        asRoot = false
+                                    )
+                                }
+                            }
+                            DesktopKeyChip("⇲ Move") {
+                                scope.launch {
+                                    runner.executeOneShot(
+                                        command = listOf("/bin/sh", "-c", "DISPLAY=:0 wmctrl -r :ACTIVE: -e 0,50,120,-1,-1 2>/dev/null"),
+                                        asRoot = false
+                                    )
+                                }
+                            }
+
+                            VerticalDivider(modifier = Modifier.height(18.dp).padding(horizontal = 2.dp), color = AmoledContainerHigh)
+
                             // Screen Sharing / WebVNC
                             IconButton(
                                 onClick = { showScreenShareDialog = true },
@@ -651,6 +720,46 @@ fun DesktopScreen(
                                             scope.launch {
                                                 runner.executeOneShot(
                                                     command = listOf("/bin/sh", "-c", "DISPLAY=:0 xfce4-appfinder 2>/dev/null &"),
+                                                    asRoot = false
+                                                )
+                                            }
+                                        }
+                                    )
+                                    HorizontalDivider(color = AmoledContainerHigh)
+                                    DropdownMenuItem(
+                                        text = { Text("Close Active Window (Alt+F4)", color = Color(0xFFFF5252), fontSize = 13.sp) },
+                                        leadingIcon = { Icon(Icons.Default.Close, null, tint = Color(0xFFFF5252), modifier = Modifier.size(18.dp)) },
+                                        onClick = {
+                                            showQuickMenu = false
+                                            scope.launch {
+                                                runner.executeOneShot(
+                                                    command = listOf("/bin/sh", "-c", "DISPLAY=:0 wmctrl -c :ACTIVE: 2>/dev/null || DISPLAY=:0 xdotool getactivewindow windowkill 2>/dev/null"),
+                                                    asRoot = false
+                                                )
+                                            }
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Un-stick Window (Move Down)", color = Color.White, fontSize = 13.sp) },
+                                        leadingIcon = { Icon(Icons.Default.OpenWith, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
+                                        onClick = {
+                                            showQuickMenu = false
+                                            scope.launch {
+                                                runner.executeOneShot(
+                                                    command = listOf("/bin/sh", "-c", "DISPLAY=:0 wmctrl -r :ACTIVE: -e 0,50,120,-1,-1 2>/dev/null"),
+                                                    asRoot = false
+                                                )
+                                            }
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Toggle Maximize Window", color = Color.White, fontSize = 13.sp) },
+                                        leadingIcon = { Icon(Icons.Default.Fullscreen, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
+                                        onClick = {
+                                            showQuickMenu = false
+                                            scope.launch {
+                                                runner.executeOneShot(
+                                                    command = listOf("/bin/sh", "-c", "DISPLAY=:0 wmctrl -r :ACTIVE: -b toggle,maximized_vert,maximized_horz 2>/dev/null"),
                                                     asRoot = false
                                                 )
                                             }
@@ -855,12 +964,13 @@ private fun DesktopKeyChip(
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
-        color = if (active) MaterialTheme.colorScheme.primary else Color(0xFF242424),
+        shape = RoundedCornerShape(14.dp),
+        color = if (active) MaterialTheme.colorScheme.primary else Color(0xCC242424),
+        border = BorderStroke(1.dp, if (active) MaterialTheme.colorScheme.primary else AmoledGlassBorder),
         modifier = Modifier.height(30.dp)
     ) {
         Box(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(

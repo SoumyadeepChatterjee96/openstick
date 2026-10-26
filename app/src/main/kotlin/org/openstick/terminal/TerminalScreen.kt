@@ -67,7 +67,7 @@ fun TerminalScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(AmoledContainer)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+                .padding(start = 48.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
@@ -317,11 +317,12 @@ private fun ModifierKeyButton(
     Button(
         onClick = onClick,
         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-        shape = RoundedCornerShape(6.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (isActive) MaterialTheme.colorScheme.primary else Color(0xFF262626),
+            containerColor = if (isActive) MaterialTheme.colorScheme.primary else Color(0xCC262626),
             contentColor = if (isActive) MaterialTheme.colorScheme.onPrimary else Color(0xFFEDE9E4)
         ),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isActive) MaterialTheme.colorScheme.primary else Color(0x33FFFFFF)),
         modifier = Modifier.height(32.dp)
     ) {
         Text(
@@ -341,11 +342,12 @@ private fun QuickKeyButton(
     Button(
         onClick = onClick,
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-        shape = RoundedCornerShape(6.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xFF1E1E1E),
+            containerColor = Color(0xCC1E1E1E),
             contentColor = Color(0xFFEDE9E4)
         ),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x22FFFFFF)),
         modifier = Modifier.height(32.dp)
     ) {
         Text(
