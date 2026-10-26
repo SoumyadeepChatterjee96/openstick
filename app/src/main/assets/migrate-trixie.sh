@@ -1,5 +1,5 @@
 #!/bin/sh
-# In-place upgrade of an existing Breadstick guest: Debian 12 (bookworm) -> 13 (trixie).
+# In-place upgrade of an existing OpenStick guest: Debian 12 (bookworm) -> 13 (trixie).
 # Run as root under proot, streamed to the Settings UI. Idempotent; safe to re-run after
 # a failure (apt resumes). User data (home directories) is untouched by design.
 export DEBIAN_FRONTEND=noninteractive
@@ -13,7 +13,7 @@ for t in systemctl systemd-tmpfiles dpkg-statoverride; do
 done
 cat > /usr/local/bin/systemd-sysusers <<'SU'
 #!/bin/sh
-# Breadstick Linux: systemd-sysusers under proot (sysusers shim version 2). Creates the users and
+# OpenStick Linux: systemd-sysusers under proot (sysusers shim version 2). Creates the users and
 # groups that sysusers.d files declare. Packages name their file bare (openssh-server.conf), found
 # in the sysusers.d folders as the real tool finds it; version 1 looked in the current directory,
 # created nothing, and so the SSH server never started (no sshd user).

@@ -1,4 +1,4 @@
-Noto Mono, bundled by Breadstick for its Terminal, under the SIL Open Font License 1.1.
+Noto Mono, bundled by OpenStick for its Terminal, under the SIL Open Font License 1.1.
 From Debian's fonts-noto-mono package; its copyright file follows unchanged.
 
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/

@@ -25,15 +25,13 @@
 # be told about after the fact. Reading only the NoDisplay shadows that apply-look.sh writes made
 # the drawer's contents depend on whether apply-look had run yet, so a different stray XFCE entry
 # turned up on each launch. Absent file = nothing extra filtered, which is the pre-1.0 behaviour.
-HIDE_LIST=${BSL_HIDE_LIST:-/usr/share/breadstick/hidden-apps.list}
-# Entries Breadstick presents under its own name, same data apply-look.sh shadows them with.
-# Applied here too, so the drawer shows "Terminal" and not "Xfce Terminal" on a fresh session,
-# before apply-look has had a chance to write the shadow copies.
-RENAME_LIST=${BSL_RENAME_LIST:-/usr/share/breadstick/renamed-apps.list}
-# Some entries only make sense in one mode. Floating renders each window into its own buffer with
-# no single screen behind them, so a screen-capture tool has nothing to grab there.
-FLOAT_LIST=${BSL_FLOAT_LIST:-/usr/share/breadstick/hidden-floating.list}
-[ "${BREADSTICK_ROOTLESS:-0}" = "1" ] || FLOAT_LIST=/dev/null
+HIDE_LIST=${BSL_HIDE_LIST:-/usr/share/openstick/hidden-apps.list}
+[ -f "$HIDE_LIST" ] || HIDE_LIST=/usr/share/breadstick/hidden-apps.list
+RENAME_LIST=${BSL_RENAME_LIST:-/usr/share/openstick/renamed-apps.list}
+[ -f "$RENAME_LIST" ] || RENAME_LIST=/usr/share/breadstick/renamed-apps.list
+FLOAT_LIST=${BSL_FLOAT_LIST:-/usr/share/openstick/hidden-floating.list}
+[ -f "$FLOAT_LIST" ] || FLOAT_LIST=/usr/share/breadstick/hidden-floating.list
+[ "${OPENSTICK_ROOTLESS:-${BREADSTICK_ROOTLESS:-0}}" = "1" ] || FLOAT_LIST=/dev/null
 
 # The files, in precedence order, first occurrence of each desktop id only. Globbing, case and [
 # are shell builtins, so this costs no processes. An empty file still claims its id (it hides the

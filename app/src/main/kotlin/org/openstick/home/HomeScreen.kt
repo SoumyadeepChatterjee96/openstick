@@ -178,7 +178,7 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Open Section (Exact Breadstick 3-tile launch bar)
+        // Open Section (OpenStick 3-tile launch bar)
         Text(
             text = "Open",
             style = MaterialTheme.typography.titleMedium,

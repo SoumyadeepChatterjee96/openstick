@@ -11,7 +11,7 @@ import androidx.compose.ui.text.style.TextDecoration
 /**
  * A minimal but correct VT100/xterm-256color terminal emulator.
  * Parses ANSI escape sequences and maintains a cell grid with scrollback.
- * Ported from Breadstick Linux's TerminalEmulator.kt architecture.
+ * OpenStick Linux TerminalEmulator architecture.
  */
 class TerminalEmulator(
     var cols: Int,

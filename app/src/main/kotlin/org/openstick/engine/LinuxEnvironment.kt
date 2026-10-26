@@ -133,21 +133,34 @@ class LinuxEnvironment(val context: Context) {
 
     fun installDesktopScripts() {
         try {
+            File(rootfsDir, "root/.openstick").mkdirs()
             File(rootfsDir, "root/.breadstick").mkdirs()
+            copyAsset("desktop/provision.sh", File(rootfsDir, "root/.openstick/provision.sh"))
             copyAsset("desktop/provision.sh", File(rootfsDir, "root/.breadstick/provision.sh"))
+            copyAsset("desktop/start-desktop-x11.sh", File(rootfsDir, "root/.openstick/start-desktop-x11.sh"))
             copyAsset("desktop/start-desktop-x11.sh", File(rootfsDir, "root/.breadstick/start-desktop-x11.sh"))
             File(rootfsDir, "usr/local/bin").mkdirs()
             copyAsset("desktop/start-desktop-x11.sh", File(rootfsDir, "usr/local/bin/start-desktop-x11"))
+            copyAsset("desktop/list-apps.sh", File(rootfsDir, "usr/local/bin/openstick-list-apps"))
             copyAsset("desktop/list-apps.sh", File(rootfsDir, "usr/local/bin/breadstick-list-apps"))
+            copyAsset("desktop/bsl-status.sh", File(rootfsDir, "usr/local/bin/openstick-status"))
             copyAsset("desktop/bsl-status.sh", File(rootfsDir, "usr/local/bin/bsl-status"))
+            copyAsset("desktop/openstick-fetch", File(rootfsDir, "usr/local/bin/openstick-fetch"))
+            copyAsset("desktop/openstick-fetch", File(rootfsDir, "usr/bin/openstick-fetch"))
             val xfwm4Wrapper = File(rootfsDir, "usr/local/bin/xfwm4")
             xfwm4Wrapper.writeText("#!/bin/sh\nexec /usr/bin/xfwm4 --compositor=off \"\$@\"\n")
             xfwm4Wrapper.setExecutable(true, false)
+            File(rootfsDir, "usr/lib/openstick").mkdirs()
             File(rootfsDir, "usr/lib/breadstick").mkdirs()
+            val openstickScript = File(rootfsDir, "usr/lib/openstick/start-desktop-x11.sh")
             val bslScript = File(rootfsDir, "usr/lib/breadstick/start-desktop-x11.sh")
+            copyAsset("desktop/start-desktop-x11.sh", openstickScript)
             copyAsset("desktop/start-desktop-x11.sh", bslScript)
+            openstickScript.setExecutable(true, false)
             bslScript.setExecutable(true, false)
             File(rootfsDir, "usr/local/bin/start-desktop-x11").setExecutable(true, false)
+            File(rootfsDir, "usr/local/bin/openstick-fetch").setExecutable(true, false)
+            File(rootfsDir, "usr/bin/openstick-fetch").setExecutable(true, false)
 
             // Neutralize 90gpg-agent so XFCE4 session never hangs on PRoot Unix sockets
             val gpgAgentScript = File(rootfsDir, "etc/X11/Xsession.d/90gpg-agent")
@@ -159,7 +172,7 @@ class LinuxEnvironment(val context: Context) {
 
     fun startDesktopCommand(display: Int = 0, user: String = "root"): String {
         installDesktopScripts()
-        return "rm -f /tmp/runtime-*/bus /tmp/.X$display-lock 2>/dev/null; export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export DISPLAY=:$display; export BREADSTICK_DARK=1; export BREADSTICK_DPI=192; export BREADSTICK_LOCALE=C.UTF-8; F=/usr/lib/breadstick/start-desktop-x11.sh; [ -f \"\$F\" ] || F=/usr/local/bin/start-desktop-x11; [ -f \"\$F\" ] || F=/root/.breadstick/start-desktop-x11.sh; if [ -f \"\$F\" ]; then exec sh \"\$F\" $display $user 0; else exec startxfce4 2>/dev/null || exec openbox-session 2>/dev/null || exec twm; fi"
+        return "rm -f /tmp/runtime-*/bus /tmp/.X$display-lock 2>/dev/null; export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export DISPLAY=:$display; export OPENSTICK_DARK=1; export BREADSTICK_DARK=1; export OPENSTICK_DPI=192; export BREADSTICK_DPI=192; export OPENSTICK_LOCALE=C.UTF-8; export BREADSTICK_LOCALE=C.UTF-8; F=/usr/lib/openstick/start-desktop-x11.sh; [ -f \"\$F\" ] || F=/usr/lib/breadstick/start-desktop-x11.sh; [ -f \"\$F\" ] || F=/usr/local/bin/start-desktop-x11; [ -f \"\$F\" ] || F=/root/.openstick/start-desktop-x11.sh; [ -f \"\$F\" ] || F=/root/.breadstick/start-desktop-x11.sh; if [ -f \"\$F\" ]; then exec sh \"\$F\" $display $user 0; else exec startxfce4 2>/dev/null || exec openbox-session 2>/dev/null || exec twm; fi"
     }
 
     private fun procStandIns(): List<String> {

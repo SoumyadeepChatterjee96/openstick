@@ -25,8 +25,8 @@ bsl_write_package_fixups() {
 # Written by a script that apt ALSO runs after every package change, because LibreOffice is
 # usually installed from a terminal in a running session, and a fix that waits for the next
 # desktop start is a fix the user never sees working.
-mkdir -p /usr/local/lib/breadstick /usr/local/bin
-cat > /usr/local/lib/breadstick/package-fixups <<'FIX'
+mkdir -p /usr/local/lib/openstick /usr/local/lib/breadstick /usr/local/bin
+cat > /usr/local/lib/openstick/package-fixups <<'FIX'
 #!/bin/sh
 # Breadstick Linux: what has to be redone when packages change. See start-desktop-x11.sh.
 P=/usr/lib/libreoffice/program
@@ -552,13 +552,14 @@ DRSEOF
 fi
 exit 0
 FIX
-chmod 755 /usr/local/lib/breadstick/package-fixups
+chmod 755 /usr/local/lib/openstick/package-fixups
+ln -sf /usr/local/lib/openstick/package-fixups /usr/local/lib/breadstick/package-fixups 2>/dev/null || true
 mkdir -p /etc/apt/apt.conf.d
-cat > /etc/apt/apt.conf.d/90breadstick-fixups <<'HOOK'
-// Breadstick Linux: see /usr/local/lib/breadstick/package-fixups.
-DPkg::Post-Invoke { "[ -x /usr/local/lib/breadstick/package-fixups ] && /usr/local/lib/breadstick/package-fixups || true"; };
+cat > /etc/apt/apt.conf.d/90openstick-fixups <<'HOOK'
+// OpenStick Linux: see /usr/local/lib/openstick/package-fixups.
+DPkg::Post-Invoke { "[ -x /usr/local/lib/openstick/package-fixups ] && /usr/local/lib/openstick/package-fixups || true"; };
 HOOK
-/usr/local/lib/breadstick/package-fixups || true
+/usr/local/lib/openstick/package-fixups || true
 }
 
 # `--fixups`: write the package fixups, run them, and stop. The package's postinst calls this so
@@ -569,10 +570,9 @@ if [ "${1:-}" = --fixups ]; then
     exit 0
 fi
 
-# Breadstick Linux identity (idempotent - also rebrands installs made before the fork).
-# The version fields are DERIVED, never hardcoded: this file used to claim bookworm on trixie
-# systems, which made Settings offer an "upgrade to Debian 13" on a system already running it.
-if ! grep -q '^ID=breadstick' /etc/os-release 2>/dev/null; then
+# OpenStick Linux identity (idempotent - also rebrands installs made before the fork).
+# The version fields are DERIVED, never hardcoded.
+if ! grep -q '^ID=openstick' /etc/os-release 2>/dev/null; then
     DEBVER="$(cut -d. -f1 /etc/debian_version 2>/dev/null | tr -dc 0-9)"
     [ -n "$DEBVER" ] || DEBVER=12
     case "$DEBVER" in
@@ -583,18 +583,19 @@ if ! grep -q '^ID=breadstick' /etc/os-release 2>/dev/null; then
         *)  DEBCODE=unknown ;;
     esac
     cat > /etc/os-release <<OSEOF
-PRETTY_NAME="Breadstick Linux (BSL)"
-NAME="Breadstick Linux"
+PRETTY_NAME="OpenStick Linux"
+NAME="OpenStick Linux"
 VERSION="$DEBVER ($DEBCODE)"
 VERSION_ID="$DEBVER"
 VERSION_CODENAME=$DEBCODE
-ID=breadstick
+ID=openstick
 ID_LIKE=debian
-HOME_URL="https://breadstick.io"
-SUPPORT_URL="https://breadstick.io"
+HOME_URL="https://openstick.org"
+SUPPORT_URL="https://openstick.org"
 OSEOF
-    ln -sf /etc/os-release /usr/lib/os-release 2>/dev/null || true
-    printf 'Welcome to Breadstick Linux (BSL) - a Debian-based fork.\n' > /etc/motd 2>/dev/null || true
+    cp /etc/os-release /usr/lib/os-release 2>/dev/null || true
+    printf 'Welcome to OpenStick Linux.\n' > /etc/motd 2>/dev/null || true
+    printf 'OpenStick Linux \\n \\l\n\n' > /etc/issue 2>/dev/null || true
 fi
 
 # System D-Bus (some GTK apps expect it). With no systemd, start it ourselves; a stale
@@ -1716,19 +1717,26 @@ if command -v xfconf-query >/dev/null 2>&1; then
         # Android light/dark switch, and after the retheme those are the names it will be on.
         ""|Adwaita|Adwaita-dark|Default)
             xfconf-query -c xsettings -p /Net/ThemeName --create -t string -s "$WANT_THEME" 2>/dev/null || true ;;
-        Breadstick|Breadstick-dark)
-            if [ "$BREADSTICK_DARK" = "1" ]; then BSL_T=Breadstick-dark; else BSL_T=Breadstick; fi
+        Breadstick|Breadstick-dark|OpenStick|OpenStick-dark)
+            if [ "${OPENSTICK_DARK:-${BREADSTICK_DARK:-1}}" = "1" ]; then BSL_T=OpenStick-dark; else BSL_T=OpenStick; fi
+            [ -d "/usr/share/themes/$BSL_T" ] || { if [ "${OPENSTICK_DARK:-${BREADSTICK_DARK:-1}}" = "1" ]; then BSL_T=Breadstick-dark; else BSL_T=Breadstick; fi; }
             if [ "$CUR_THEME" != "$BSL_T" ]; then
                 xfconf-query -c xsettings -p /Net/ThemeName --create -t string -s "$BSL_T" 2>/dev/null || true
                 # Frames are a separate setting and must move with the widgets.
                 BSL_F="$BSL_T"
-                case "$BREADSTICK_DPI" in
+                dpi="${OPENSTICK_DPI:-${BREADSTICK_DPI:-192}}"
+                case "$dpi" in
                     ""|*[!0-9]*) : ;;
-                    *) [ "$BREADSTICK_DPI" -ge 132 ] && BSL_F="$BSL_T-hidpi" ;;
+                    *) [ "$dpi" -ge 132 ] && BSL_F="$BSL_T-hidpi" ;;
                 esac
+                [ -d "/usr/share/themes/$BSL_F" ] || BSL_F="$BSL_T"
                 xfconf-query -c xfwm4 -p /general/theme --create -t string -s "$BSL_F" 2>/dev/null || true
-                BSL_W=/usr/share/backgrounds/breadstick/breadstick-light.png
-                [ "$BREADSTICK_DARK" = "1" ] && BSL_W=/usr/share/backgrounds/breadstick/breadstick-dark.png
+                BSL_W=/usr/share/backgrounds/openstick/breadstick-light.png
+                [ -f "$BSL_W" ] || BSL_W=/usr/share/backgrounds/breadstick/breadstick-light.png
+                if [ "${OPENSTICK_DARK:-${BREADSTICK_DARK:-1}}" = "1" ]; then
+                    BSL_W=/usr/share/backgrounds/openstick/breadstick-dark.png
+                    [ -f "$BSL_W" ] || BSL_W=/usr/share/backgrounds/breadstick/breadstick-dark.png
+                fi
                 xfconf-query -c xfce4-desktop \
                     -p /backdrop/screen0/monitor0/workspace0/last-image \
                     --create -t string -s "$BSL_W" 2>/dev/null || true
@@ -1856,21 +1864,34 @@ else
 fi
 '
 
-export BREADSTICK_ROOTLESS="$R"
-: "${BREADSTICK_WAYLAND:=0}"
-export BREADSTICK_WAYLAND
-: "${BREADSTICK_COMPOSITOR:=0}"
-export BREADSTICK_COMPOSITOR
-: "${BREADSTICK_GPU:=0}"
-export BREADSTICK_GPU
+: "${OPENSTICK_ROOTLESS:=${BREADSTICK_ROOTLESS:=$R}}"
+export OPENSTICK_ROOTLESS
+export BREADSTICK_ROOTLESS="$OPENSTICK_ROOTLESS"
+: "${OPENSTICK_WAYLAND:=${BREADSTICK_WAYLAND:=0}}"
+export OPENSTICK_WAYLAND
+export BREADSTICK_WAYLAND="$OPENSTICK_WAYLAND"
+: "${OPENSTICK_COMPOSITOR:=${BREADSTICK_COMPOSITOR:=0}}"
+export OPENSTICK_COMPOSITOR
+export BREADSTICK_COMPOSITOR="$OPENSTICK_COMPOSITOR"
+: "${OPENSTICK_GPU:=${BREADSTICK_GPU:=0}}"
+export OPENSTICK_GPU
+export BREADSTICK_GPU="$OPENSTICK_GPU"
+: "${OPENSTICK_DARK:=${BREADSTICK_DARK:=1}}"
+export OPENSTICK_DARK
+export BREADSTICK_DARK="$OPENSTICK_DARK"
+: "${OPENSTICK_LOCALE:=${BREADSTICK_LOCALE:=C.UTF-8}}"
+export OPENSTICK_LOCALE
+export BREADSTICK_LOCALE="$OPENSTICK_LOCALE"
+: "${OPENSTICK_DPI:=${BREADSTICK_DPI:=192}}"
+export OPENSTICK_DPI
+export BREADSTICK_DPI="$OPENSTICK_DPI"
+
 # exec, because nothing runs after this and a shell left waiting on the session is one more
 # process against Android's per-app limit (see the process budget notes in apply-look.sh). The
 # exit status is unchanged: su already returns the session's.
 if [ "$U" = "root" ]; then
     exec sh -c "$SESSION"
 else
-    # su starts a FRESH environment: every BREADSTICK_* the session reads must be listed here
-    # explicitly or it silently vanishes for non-root users (dark mode fell into exactly
-    # this hole: exported by the app, dropped by su, worked only for root).
-    exec su - "$U" -c "export BREADSTICK_ROOTLESS=$R BREADSTICK_WAYLAND=$BREADSTICK_WAYLAND BREADSTICK_COMPOSITOR=$BREADSTICK_COMPOSITOR BREADSTICK_GPU=$BREADSTICK_GPU BREADSTICK_DARK=$BREADSTICK_DARK BREADSTICK_LOCALE=$BREADSTICK_LOCALE BREADSTICK_DPI=$BREADSTICK_DPI; $SESSION"
+    # su starts a FRESH environment: every OPENSTICK_* / BREADSTICK_* the session reads must be listed here
+    exec su - "$U" -c "export OPENSTICK_ROOTLESS=$OPENSTICK_ROOTLESS BREADSTICK_ROOTLESS=$OPENSTICK_ROOTLESS OPENSTICK_WAYLAND=$OPENSTICK_WAYLAND BREADSTICK_WAYLAND=$OPENSTICK_WAYLAND OPENSTICK_COMPOSITOR=$OPENSTICK_COMPOSITOR BREADSTICK_COMPOSITOR=$OPENSTICK_COMPOSITOR OPENSTICK_GPU=$OPENSTICK_GPU BREADSTICK_GPU=$OPENSTICK_GPU OPENSTICK_DARK=$OPENSTICK_DARK BREADSTICK_DARK=$OPENSTICK_DARK OPENSTICK_LOCALE=$OPENSTICK_LOCALE BREADSTICK_LOCALE=$OPENSTICK_LOCALE OPENSTICK_DPI=$OPENSTICK_DPI BREADSTICK_DPI=$OPENSTICK_DPI; $SESSION"
 fi

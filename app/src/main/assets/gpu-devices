@@ -1,13 +1,13 @@
-# Breadstick Linux: GPU acceleration verdicts by graphics chip and driver (gpu.md "Policy").
+# OpenStick Linux: GPU acceleration verdicts by graphics chip and driver (gpu.md "Policy").
 # version: 2
 #
 # One line per rule, TAB-separated, first match wins, plain substrings (no patterns):
 #
 #   verdict  renderer-substring  driver-substring  mesa-prefix  min-GLES  note
 #
-# verdict      verified   tested by Breadstick on this chip AND driver: the recommended setting
+# verdict      verified   tested by OpenStick on this chip AND driver: the recommended setting
 #                         turns the GPU on by itself for Pro, once this device's own test passed.
-#              beta       runs, or expected to, but not tested by Breadstick: one tap after a
+#              beta       runs, or expected to, but not tested by OpenStick: one tap after a
 #                         pass on this device, never automatic, not advertised.
 #              blocked    known not to work: off, no override (a bad driver in the field reaches
 #                         every device within a day through this file).
@@ -23,13 +23,13 @@
 # goes in only after the 2.0 soak (W12) on that device: zero crashes, flat memory.
 #
 # The order matters: a specific chip before its family, a family before the catch-alls.
-beta	Mali-G925	r49p1	25.	3.1	Galaxy Tab S11 Ultra: Breadstick's own test device; verified after the 2.0 soak
+beta	Mali-G925	r49p1	25.	3.1	Galaxy Tab S11 Ultra: OpenStick's own test device; verified after the 2.0 soak
 beta	PowerVR		25.	3.1	Pixel 10 Pro XL: runs (desktop OpenGL 2.1)
-beta	X1-85	ANGLE 2.1	25.0.	3.1	XPS Googlebook (ANGLE on Vulkan): runs, tested by Breadstick 2026-10-06; light drawing is faster in software; browsers stay in software
-beta	Adreno		25.	3.1	not tested by Breadstick; browsers stay in software
-beta	Xclipse		25.	3.1	not tested by Breadstick
-beta	Mali-G		25.	3.1	not tested on this chip by Breadstick
-beta	Mali		25.	3.1	not tested on this chip by Breadstick
+beta	X1-85	ANGLE 2.1	25.0.	3.1	XPS Googlebook (ANGLE on Vulkan): runs, tested by OpenStick 2026-10-06; light drawing is faster in software; browsers stay in software
+beta	Adreno		25.	3.1	not tested by OpenStick; browsers stay in software
+beta	Xclipse		25.	3.1	not tested by OpenStick
+beta	Mali-G		25.	3.1	not tested on this chip by OpenStick
+beta	Mali		25.	3.1	not tested on this chip by OpenStick
 beta			22.	3.1	Debian 12 Mesa: not tested
-beta			25.	3.1	not tested on this chip by Breadstick
-beta				3.1	not tested on this chip or this Mesa by Breadstick
+beta			25.	3.1	not tested on this chip by OpenStick
+beta				3.1	not tested on this chip or this Mesa by OpenStick

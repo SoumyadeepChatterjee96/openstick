@@ -1,4 +1,4 @@
-JetBrains Mono, bundled by Breadstick for its Terminal.
+JetBrains Mono, bundled by OpenStick for its Terminal.
 From Ubuntu 24.04's fonts-jetbrains-mono 2.304+ds-4 (built from source by Debian). Its copyright
 file follows unchanged, then the full Apache License 2.0 it names.
 

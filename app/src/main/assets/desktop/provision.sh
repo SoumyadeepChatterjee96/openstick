@@ -11,17 +11,11 @@ export DEBIAN_FRONTEND=noninteractive
 printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d
 chmod 0755 /usr/sbin/policy-rc.d
 
-echo "[BSL] apt-get update (incl. apt.breadstick.io)..."
+echo "[OpenStick] apt-get update..."
 apt-get update
 
-# Install the whole desktop via the Breadstick metapackage from apt.breadstick.io — it depends on
-# the BSL components (breadstick-session, breadstick-tools) plus the desktop stack, so updates come
-# via apt. If the repo is unreachable or the package is missing, fall back to the explicit list.
-#
-# IMPORTANT: --no-install-recommends. The recommended GNOME stack (nautilus -> gvfs ->
-# polkit/udisks2/upower/rtkit) cannot configure under proot (no systemd/logind, can't setresgid)
-# and is not used by the app model — pulling it wedges dpkg/apt. Keep the set lean and proot-safe.
-echo "[BSL] installing breadstick-desktop (metapackage)..."
+# Install the desktop stack
+echo "[OpenStick] installing desktop packages..."
 # Emit apt's machine-readable progress so the app can show a real percentage instead of an
 # indeterminate spinner — this is a ~180 MB download and the wait IS the first-run experience.
 # fd 3 carries apt's status protocol to the pipe; apt's ordinary output goes to stderr, which
@@ -157,11 +151,14 @@ fi
 
 apt-get clean
 if command -v xfce4-session >/dev/null 2>&1 || command -v openbox >/dev/null 2>&1; then
-    mkdir -p /etc/breadstick
+    mkdir -p /etc/openstick /etc/breadstick
+    : > /etc/openstick/desktop-ok
     : > /etc/breadstick/desktop-ok
+    echo "OPENSTICK_PROVISION_DONE"
     echo "BREADSTICK_PROVISION_DONE"
 else
-    rm -f /etc/breadstick/desktop-ok 2>/dev/null || true
+    rm -f /etc/openstick/desktop-ok /etc/breadstick/desktop-ok 2>/dev/null || true
+    echo "OPENSTICK_PROVISION_INCOMPLETE"
     echo "BREADSTICK_PROVISION_INCOMPLETE"
     exit 1
 fi

@@ -48,7 +48,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 import io.breadstick.x11.LorieView
 import io.breadstick.x11.X11Server
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import android.view.HapticFeedbackConstants
 import org.openstick.engine.GpuServer
 import org.openstick.engine.HardwareBridges
 import org.openstick.engine.LinuxEnvironment
@@ -87,6 +90,7 @@ fun DesktopScreen(
     var inputFieldValue by remember { mutableStateOf(TextFieldValue("")) }
 
     var isToolbarExpanded by remember { mutableStateOf(true) }
+    var isTrackpadMode by remember { mutableStateOf(false) }
     var showQuickMenu by remember { mutableStateOf(false) }
     var showScreenShareDialog by remember { mutableStateOf(false) }
 
@@ -205,9 +209,20 @@ fun DesktopScreen(
             )
 
             // 2. Fullscreen Edge-to-Edge LorieView Canvas
+            var downX by remember { mutableFloatStateOf(0f) }
+            var downY by remember { mutableFloatStateOf(0f) }
+            var prevTouchX by remember { mutableFloatStateOf(0f) }
+            var prevTouchY by remember { mutableFloatStateOf(0f) }
+            var cursorX by remember { mutableFloatStateOf(540f) }
+            var cursorY by remember { mutableFloatStateOf(1170f) }
+            var isDragging by remember { mutableStateOf(false) }
+            var hasTriggeredLongPress by remember { mutableStateOf(false) }
+            var longPressJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
             var twoFingerDownTime by remember { mutableLongStateOf(0L) }
             var isTwoFingerScrolling by remember { mutableStateOf(false) }
             var lastTwoFingerY by remember { mutableFloatStateOf(0f) }
+            val touchSlop = remember { 10f * context.resources.displayMetrics.density }
+            val longPressTimeout = 400L
 
             AndroidView(
                 factory = { ctx ->
@@ -223,23 +238,132 @@ fun DesktopScreen(
                         }
 
                         setOnTouchListener { _, event ->
-                            lastTapX = event.x
-                            lastTapY = event.y
+                            if (event.isFromSource(InputDevice.SOURCE_MOUSE)) {
+                                val button = when {
+                                    event.buttonState and MotionEvent.BUTTON_PRIMARY != 0 -> 1
+                                    event.buttonState and MotionEvent.BUTTON_SECONDARY != 0 -> 3
+                                    event.buttonState and MotionEvent.BUTTON_TERTIARY != 0 -> 2
+                                    else -> 0
+                                }
+                                when (event.actionMasked) {
+                                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_BUTTON_PRESS -> {
+                                        sendMouseEvent(event.x, event.y, button, true, false)
+                                    }
+                                    MotionEvent.ACTION_MOVE -> {
+                                        sendMouseEvent(event.x, event.y, button, button != 0, false)
+                                    }
+                                    MotionEvent.ACTION_UP, MotionEvent.ACTION_BUTTON_RELEASE -> {
+                                        sendMouseEvent(event.x, event.y, button, false, false)
+                                    }
+                                }
+                                return@setOnTouchListener true
+                            }
+
+                            lastTapX = if (isTrackpadMode) cursorX else event.x
+                            lastTapY = if (isTrackpadMode) cursorY else event.y
 
                             val pointerCount = event.pointerCount
                             when (event.actionMasked) {
+                                MotionEvent.ACTION_DOWN -> {
+                                    downX = event.x
+                                    downY = event.y
+                                    prevTouchX = event.x
+                                    prevTouchY = event.y
+                                    isDragging = false
+                                    hasTriggeredLongPress = false
+
+                                    if (!isTrackpadMode) {
+                                        cursorX = event.x
+                                        cursorY = event.y
+                                        lastTapX = event.x
+                                        lastTapY = event.y
+                                        sendMouseEvent(cursorX, cursorY, 0, false, false)
+
+                                        longPressJob?.cancel()
+                                        longPressJob = scope.launch {
+                                            kotlinx.coroutines.delay(longPressTimeout)
+                                            if (!isDragging) {
+                                                hasTriggeredLongPress = true
+                                                sendMouseEvent(downX, downY, 3, true, false)
+                                                sendMouseEvent(downX, downY, 3, false, false)
+                                                try {
+                                                    performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                                                } catch (_: Exception) {}
+                                            }
+                                        }
+                                    }
+                                }
+
                                 MotionEvent.ACTION_POINTER_DOWN -> {
+                                    longPressJob?.cancel()
                                     if (pointerCount == 2) {
                                         twoFingerDownTime = System.currentTimeMillis()
                                         isTwoFingerScrolling = false
                                         lastTwoFingerY = (event.getY(0) + event.getY(1)) / 2f
+                                        if (isDragging) {
+                                            sendMouseEvent(cursorX, cursorY, 1, false, false)
+                                            isDragging = false
+                                        }
                                     }
                                 }
+
+                                MotionEvent.ACTION_MOVE -> {
+                                    if (pointerCount == 1) {
+                                        if (isTrackpadMode) {
+                                            val dx = (event.x - prevTouchX) * 1.5f
+                                            val dy = (event.y - prevTouchY) * 1.5f
+                                            prevTouchX = event.x
+                                            prevTouchY = event.y
+                                            val w = if (width > 0) width.toFloat() else 1080f
+                                            val h = if (height > 0) height.toFloat() else 2340f
+                                            cursorX = (cursorX + dx).coerceIn(0f, w)
+                                            cursorY = (cursorY + dy).coerceIn(0f, h)
+                                            lastTapX = cursorX
+                                            lastTapY = cursorY
+                                            sendMouseEvent(cursorX, cursorY, 0, false, false)
+                                        } else {
+                                            val dx = event.x - downX
+                                            val dy = event.y - downY
+                                            val distSq = dx * dx + dy * dy
+                                            if (distSq > touchSlop * touchSlop) {
+                                                longPressJob?.cancel()
+                                                if (!hasTriggeredLongPress) {
+                                                    cursorX = event.x
+                                                    cursorY = event.y
+                                                    lastTapX = event.x
+                                                    lastTapY = event.y
+                                                    if (!isDragging) {
+                                                        isDragging = true
+                                                        sendMouseEvent(downX, downY, 1, true, false)
+                                                    }
+                                                    sendMouseEvent(cursorX, cursorY, 1, true, false)
+                                                }
+                                            } else {
+                                                cursorX = event.x
+                                                cursorY = event.y
+                                                lastTapX = event.x
+                                                lastTapY = event.y
+                                                sendMouseEvent(cursorX, cursorY, 0, false, false)
+                                            }
+                                        }
+                                    } else if (pointerCount == 2) {
+                                        longPressJob?.cancel()
+                                        val currentY = (event.getY(0) + event.getY(1)) / 2f
+                                        val deltaY = currentY - lastTwoFingerY
+                                        if (kotlin.math.abs(deltaY) > 8f) {
+                                            isTwoFingerScrolling = true
+                                            val button = if (deltaY > 0) 4 else 5
+                                            sendMouseEvent(lastTapX, lastTapY, button, true, false)
+                                            sendMouseEvent(lastTapX, lastTapY, button, false, false)
+                                            lastTwoFingerY = currentY
+                                        }
+                                    }
+                                }
+
                                 MotionEvent.ACTION_POINTER_UP -> {
                                     if (pointerCount == 2 && !isTwoFingerScrolling) {
                                         val duration = System.currentTimeMillis() - twoFingerDownTime
                                         if (duration < 350) {
-                                            // 2-finger tap -> Right Click!
                                             val tapX = (event.getX(0) + event.getX(1)) / 2f
                                             val tapY = (event.getY(0) + event.getY(1)) / 2f
                                             sendMouseEvent(tapX, tapY, 3, true, false)
@@ -248,40 +372,69 @@ fun DesktopScreen(
                                         }
                                     }
                                 }
-                                MotionEvent.ACTION_MOVE -> {
-                                    if (pointerCount == 2) {
-                                        val currentY = (event.getY(0) + event.getY(1)) / 2f
-                                        val deltaY = currentY - lastTwoFingerY
-                                        if (kotlin.math.abs(deltaY) > 15) {
-                                            isTwoFingerScrolling = true
-                                            // Mouse Wheel scroll
-                                            sendMouseEvent(0f, -deltaY * 5f, 4, false, true)
-                                            lastTwoFingerY = currentY
-                                            return@setOnTouchListener true
+
+                                MotionEvent.ACTION_UP -> {
+                                    longPressJob?.cancel()
+                                    if (pointerCount == 1 && !hasTriggeredLongPress) {
+                                        if (isTrackpadMode) {
+                                            val dx = event.x - downX
+                                            val dy = event.y - downY
+                                            if (dx * dx + dy * dy <= touchSlop * touchSlop) {
+                                                sendMouseEvent(cursorX, cursorY, 1, true, false)
+                                                sendMouseEvent(cursorX, cursorY, 1, false, false)
+                                            }
+                                        } else {
+                                            if (isDragging) {
+                                                sendMouseEvent(cursorX, cursorY, 1, false, false)
+                                                isDragging = false
+                                            } else {
+                                                cursorX = event.x
+                                                cursorY = event.y
+                                                lastTapX = event.x
+                                                lastTapY = event.y
+                                                sendMouseEvent(cursorX, cursorY, 0, false, false)
+                                                sendMouseEvent(cursorX, cursorY, 1, true, false)
+                                                sendMouseEvent(cursorX, cursorY, 1, false, false)
+                                            }
                                         }
                                     }
+                                    hasTriggeredLongPress = false
+                                }
+
+                                MotionEvent.ACTION_CANCEL -> {
+                                    longPressJob?.cancel()
+                                    if (isDragging) {
+                                        sendMouseEvent(cursorX, cursorY, 1, false, false)
+                                        isDragging = false
+                                    }
+                                    hasTriggeredLongPress = false
                                 }
                             }
-
-                            sendTouchEvent(
-                                event.actionMasked,
-                                event.getPointerId(event.actionIndex),
-                                event.x.toInt(),
-                                event.y.toInt()
-                            )
                             true
                         }
 
                         setOnGenericMotionListener { _, event ->
                             if (event.isFromSource(InputDevice.SOURCE_MOUSE)) {
-                                sendMouseEvent(
-                                    event.x,
-                                    event.y,
-                                    event.buttonState,
-                                    event.action == MotionEvent.ACTION_DOWN,
-                                    false
-                                )
-                                true
+                                when (event.action) {
+                                    MotionEvent.ACTION_HOVER_MOVE -> {
+                                        cursorX = event.x
+                                        cursorY = event.y
+                                        lastTapX = event.x
+                                        lastTapY = event.y
+                                        sendMouseEvent(event.x, event.y, 0, false, false)
+                                        true
+                                    }
+                                    MotionEvent.ACTION_SCROLL -> {
+                                        val vscroll = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
+                                        if (vscroll != 0f) {
+                                            val button = if (vscroll > 0) 4 else 5
+                                            sendMouseEvent(event.x, event.y, button, true, false)
+                                            sendMouseEvent(event.x, event.y, button, false, false)
+                                        }
+                                        true
+                                    }
+                                    else -> false
+                                }
                             } else false
                         }
                     }
@@ -374,6 +527,14 @@ fun DesktopScreen(
                                     tint = if (isKeyboardVisible) MaterialTheme.colorScheme.primary else Color.White,
                                     modifier = Modifier.size(18.dp)
                                 )
+                            }
+
+                            // Mode toggle chip: Direct Touch vs Trackpad
+                            DesktopKeyChip(
+                                label = if (isTrackpadMode) "Trackpad" else "Touch",
+                                active = isTrackpadMode
+                            ) {
+                                isTrackpadMode = !isTrackpadMode
                             }
 
                             // Mouse buttons

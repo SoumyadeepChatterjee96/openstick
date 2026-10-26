@@ -262,7 +262,7 @@ fun TerminalScreen(
             }
         }
 
-        // Mobile Quick-Key Toolbar (Pure Termux / Breadstick Style)
+        // Mobile Quick-Key Toolbar (OpenStick Style)
         Row(
             modifier = Modifier
                 .fillMaxWidth()

@@ -1,5 +1,5 @@
 #!/bin/sh
-# bsl-status — read Android device state bridged into Breadstick Linux by the host app.
+# openstick-status / bsl-status — read Android device state bridged into OpenStick Linux by the host app.
 # The host writes plain files under /run/bsl/ (battery, online, network_type, ...). Usage:
 #   bsl-status            # print everything (key=value)
 #   bsl-status battery    # 0-100, or -1 if unknown

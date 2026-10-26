@@ -20,16 +20,18 @@ printf '%s:%s\n' "$U" "$P" | chpasswd
 # ... but authorize by NAME too: under proot the faked uid may not carry the
 # sudo group, so a %sudo rule alone isn't reliable.
 mkdir -p /etc/sudoers.d
-printf '%s ALL=(ALL:ALL) ALL\n' "$U" > /etc/sudoers.d/breadstick
-chmod 0440 /etc/sudoers.d/breadstick
+printf '%s ALL=(ALL:ALL) ALL\n' "$U" > /etc/sudoers.d/openstick
+chmod 0440 /etc/sudoers.d/openstick
+# Maintain backward compatibility link
+ln -sf /etc/sudoers.d/openstick /etc/sudoers.d/breadstick 2>/dev/null || true
 
-mkdir -p /etc/breadstick
+mkdir -p /etc/openstick /etc/breadstick
+printf '%s' "$U" > /etc/openstick/username
 printf '%s' "$U" > /etc/breadstick/username
 
-# Breadstick Linux (BSL) identity - a Debian-based fork. Cosmetic os identity so the guest
-# presents as BSL; the Debian base is unchanged underneath. Version fields are DERIVED from
-# /etc/debian_version, never hardcoded: this used to stamp "12 (bookworm)" onto trixie
-# installs, so Settings offered an upgrade to Debian 13 on a system already running it.
+# OpenStick Linux identity - a Debian-based fork. Cosmetic os identity so the guest
+# presents as OpenStick Linux; the Debian base is unchanged underneath. Version fields are DERIVED from
+# /etc/debian_version, never hardcoded.
 DEBVER="$(cut -d. -f1 /etc/debian_version 2>/dev/null | tr -dc 0-9)"
 [ -n "$DEBVER" ] || DEBVER=12
 case "$DEBVER" in
@@ -40,19 +42,19 @@ case "$DEBVER" in
     *)  DEBCODE=unknown ;;
 esac
 cat > /etc/os-release <<EOF
-PRETTY_NAME="Breadstick Linux (BSL)"
-NAME="Breadstick Linux"
+PRETTY_NAME="OpenStick Linux"
+NAME="OpenStick Linux"
 VERSION="$DEBVER ($DEBCODE)"
 VERSION_ID="$DEBVER"
 VERSION_CODENAME=$DEBCODE
-ID=breadstick
+ID=openstick
 ID_LIKE=debian
-HOME_URL="https://breadstick.io"
-SUPPORT_URL="https://breadstick.io"
+HOME_URL="https://openstick.org"
+SUPPORT_URL="https://openstick.org"
 EOF
-ln -sf /etc/os-release /usr/lib/os-release 2>/dev/null || true
-printf 'Breadstick Linux (BSL) \\n \\l\n\n' > /etc/issue 2>/dev/null || true
-printf 'Welcome to Breadstick Linux (BSL) - a Debian-based fork.\n' > /etc/motd 2>/dev/null || true
+cp /etc/os-release /usr/lib/os-release 2>/dev/null || true
+printf 'OpenStick Linux \\n \\l\n\n' > /etc/issue 2>/dev/null || true
+printf 'Welcome to OpenStick Linux.\n' > /etc/motd 2>/dev/null || true
 
 # The greeting on every interactive shell, in all three ways to get one: the app's Terminal,
 # xfce4-terminal on the desktop, and ssh. It goes in ~/.bashrc rather than /etc/profile.d because
@@ -64,22 +66,22 @@ printf 'Welcome to Breadstick Linux (BSL) - a Debian-based fork.\n' > /etc/motd 
 # Marked and guarded so it is appended once and is obvious to anyone who wants it gone: deleting
 # the two lines is the supported way to turn it off.
 BRC="/home/$U/.bashrc"
-if [ -f "$BRC" ] && ! grep -q 'bsl-fetch' "$BRC" 2>/dev/null; then
+if [ -f "$BRC" ] && ! grep -q 'openstick-fetch' "$BRC" 2>/dev/null; then
     cat >> "$BRC" <<'BRCEOF'
 
-# Breadstick greeting. Delete these two lines if you would rather have a quiet shell.
-case $- in *i*) [ -x /usr/bin/bsl-fetch ] && bsl-fetch ;; esac
+# OpenStick greeting. Delete these two lines if you would rather have a quiet shell.
+case $- in *i*) [ -x /usr/bin/openstick-fetch ] && openstick-fetch ;; esac
 BRCEOF
     chown "$U:$U" "$BRC" 2>/dev/null || true
 fi
 
 # Same for any account made later.
-if [ -f /etc/skel/.bashrc ] && ! grep -q 'bsl-fetch' /etc/skel/.bashrc 2>/dev/null; then
+if [ -f /etc/skel/.bashrc ] && ! grep -q 'openstick-fetch' /etc/skel/.bashrc 2>/dev/null; then
     cat >> /etc/skel/.bashrc <<'BRCEOF'
 
-# Breadstick greeting. Delete these two lines if you would rather have a quiet shell.
-case $- in *i*) [ -x /usr/bin/bsl-fetch ] && bsl-fetch ;; esac
+# OpenStick greeting. Delete these two lines if you would rather have a quiet shell.
+case $- in *i*) [ -x /usr/bin/openstick-fetch ] && openstick-fetch ;; esac
 BRCEOF
 fi
 
-echo BREADSTICK_USER_OK
+echo OPENSTICK_USER_OK

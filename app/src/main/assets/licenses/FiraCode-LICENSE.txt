@@ -1,4 +1,4 @@
-Fira Code, bundled by Breadstick for its Terminal, under the SIL Open Font License 1.1.
+Fira Code, bundled by OpenStick for its Terminal, under the SIL Open Font License 1.1.
 From Ubuntu 24.04's fonts-firacode 6.2-2; its copyright file follows unchanged.
 
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/

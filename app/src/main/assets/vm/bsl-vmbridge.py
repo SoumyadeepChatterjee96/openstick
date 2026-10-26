@@ -1,4 +1,4 @@
-"""Breadstick VM bridge: the Linux half of the files the app and Linux share in /tmp.
+"""OpenStick VM bridge: the Linux half of the files the app and Linux share in /tmp.
 
 Shipped in the app (assets/vm/bsl-vmbridge.py) and run by it through the VM agent, as the Linux user,
 for as long as a desktop session runs; stdin and stdout are the channel (rootfs vm/PROTOCOL.md,

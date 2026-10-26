@@ -12,6 +12,7 @@ import org.openstick.engine.LinuxEnvironment
 import org.openstick.engine.ProotRunner
 import java.io.File
 import java.io.OutputStream
+import java.util.UUID
 
 enum class SplitMode {
     SINGLE,
@@ -55,6 +56,8 @@ class TerminalTab(
 
     // Track whether the process has been started at all
     private var started = false
+    private val sessionKey = UUID.randomUUID().toString().replace("-", "").take(8)
+    private val winchFifo = File(env.rootfsDir, "tmp/.winch-$sessionKey")
 
     fun start() {
         if (started) return
@@ -66,11 +69,12 @@ class TerminalTab(
         val cols = emulator.cols
         val rows = emulator.rows
 
-        // Build shell command using `script` for PTY allocation (exactly like Breadstick)
+        // Build shell command using `script` for PTY allocation with out-of-band WINCH fifo
+        val fifoGuest = "/tmp/.winch-$sessionKey"
         val shellCmd = if (File(env.rootfsDir, "usr/bin/script").exists()) {
             listOf(
                 "/usr/bin/script", "-qfc",
-                "stty cols $cols rows $rows 2>/dev/null; exec /bin/bash --login",
+                "{ [ -p $fifoGuest ] || { rm -f $fifoGuest; mkfifo $fifoGuest; }; } 2>/dev/null; exec 4<&0; ( { exec 3<>$fifoGuest; } 2>/dev/null || exit 0; while read -r c r <&3; do [ -n \"\$c\" ] && [ -n \"\$r\" ] && stty cols \"\$c\" rows \"\$r\" <&4 2>/dev/null; done ) & stty cols $cols rows $rows 2>/dev/null; exec /bin/bash --login",
                 "/dev/null"
             )
         } else {
@@ -104,6 +108,7 @@ class TerminalTab(
                         emulator.feed(buffer, read)
                         snapshot = emulator.snapshot()
                     }
+                    Log.d(TAG, "OUT: " + String(buffer, 0, read, Charsets.UTF_8).replace("\r", "\\r").replace("\n", "\\n"))
                 }
 
                 proc.waitFor()
@@ -137,12 +142,30 @@ class TerminalTab(
 
     fun resize(cols: Int, rows: Int) {
         if (cols < 1 || rows < 1) return
+        if (cols == emulator.cols && rows == emulator.rows) return
+        Log.d(TAG, "resize called: cols=$cols rows=$rows (was ${emulator.cols}x${emulator.rows})")
         synchronized(emulator) {
             emulator.resize(cols, rows)
             snapshot = emulator.snapshot()
         }
-        // Signal the guest shell about the new size via stty
-        write("stty cols $cols rows $rows 2>/dev/null\n")
+        // Signal the guest shell out-of-band via FIFO without polluting stdin!
+        scope.launch(Dispatchers.IO) {
+            try {
+                if (winchFifo.exists()) {
+                    val fd = android.system.Os.open(
+                        winchFifo.absolutePath,
+                        android.system.OsConstants.O_WRONLY or android.system.OsConstants.O_NONBLOCK,
+                        0
+                    )
+                    try {
+                        val bytes = "$cols $rows\n".toByteArray(Charsets.UTF_8)
+                        android.system.Os.write(fd, bytes, 0, bytes.size)
+                    } finally {
+                        android.system.Os.close(fd)
+                    }
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     fun stop() {
@@ -150,6 +173,7 @@ class TerminalTab(
             write("exit\n")
             Thread.sleep(100)
             process?.destroy()
+            winchFifo.delete()
         } catch (_: Exception) {}
         isRunning = false
         process = null
