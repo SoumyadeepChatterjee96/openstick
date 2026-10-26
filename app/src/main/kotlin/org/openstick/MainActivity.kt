@@ -59,7 +59,21 @@ class MainActivity : ComponentActivity() {
         val initialThemeOrdinal = prefs.getInt("theme_mode", AppThemeMode.AMOLED_BLACK.ordinal)
         val initialTheme = AppThemeMode.values().getOrElse(initialThemeOrdinal) { AppThemeMode.AMOLED_BLACK }
 
-        // Start hardware and software bridges
+        // Restore user-enabled bridges (strictly false by default)
+        HardwareBridges.cameraBridgeEnabled = prefs.getBoolean("bridge_camera", false)
+        HardwareBridges.micBridgeEnabled = prefs.getBoolean("bridge_mic", false)
+        HardwareBridges.audioOutputEnabled = prefs.getBoolean("bridge_audio", false)
+        HardwareBridges.notificationBridgeEnabled = prefs.getBoolean("bridge_notif", false)
+        HardwareBridges.calendarSyncEnabled = prefs.getBoolean("bridge_calendar", false)
+        HardwareBridges.clipboardSyncEnabled = prefs.getBoolean("bridge_clipboard", false)
+        HardwareBridges.printingBridgeEnabled = prefs.getBoolean("bridge_printing", false)
+
+        // Apply saved DNS choice
+        val savedDns = prefs.getString("selected_dns", "Cloudflare") ?: "Cloudflare"
+        val customDns = prefs.getString("custom_dns_ip", "") ?: ""
+        HardwareBridges.applyDnsConfig(env, savedDns, customDns)
+
+        // Start hardware and software bridges safely
         try {
             HardwareBridges.startAll(this, env, lifecycleScope)
         } catch (_: Exception) {}

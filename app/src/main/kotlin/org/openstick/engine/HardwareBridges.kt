@@ -4,78 +4,229 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import org.openstick.bridge.*
 import java.io.File
 
 object HardwareBridges {
     private const val TAG = "HardwareBridges"
 
-    var cameraBridgeEnabled = true
-    var micBridgeEnabled = true
-    var audioOutputEnabled = true
-    var notificationBridgeEnabled = true
-    var calendarSyncEnabled = true
-    var clipboardSyncEnabled = true
-    var printingBridgeEnabled = true
+    var cameraBridgeEnabled = false
+    var micBridgeEnabled = false
+    var audioOutputEnabled = false
+    var notificationBridgeEnabled = false
+    var calendarSyncEnabled = false
+    var clipboardSyncEnabled = false
+    var printingBridgeEnabled = false
     var sshServerEnabled = false
     var vncServerEnabled = false
     var processLimit = 32
 
     fun applyDnsConfig(env: LinuxEnvironment, dnsChoice: String, customIp: String = "") {
-        dnsBridge?.applyCurrentDns()
+        val servers = when (dnsChoice) {
+            "Cloudflare" -> listOf("1.1.1.1", "1.0.0.1")
+            "Google" -> listOf("8.8.8.8", "8.8.4.4")
+            "OpenDNS" -> listOf("208.67.222.222", "208.67.220.220")
+            "Custom" -> if (customIp.isNotBlank()) listOf(customIp) else listOf("1.1.1.1")
+            else -> emptyList()
+        }
+        if (servers.isNotEmpty()) {
+            if (dnsBridge != null) {
+                dnsBridge?.applyCustomDns(servers)
+            } else {
+                try {
+                    val f = File(env.rootfsDir, "etc/resolv.conf")
+                    f.parentFile?.mkdirs()
+                    f.writeText("# Configured by OpenStick\n" + servers.joinToString("") { "nameserver $it\n" })
+                } catch (_: Exception) {}
+            }
+        } else {
+            dnsBridge?.applyCurrentDns()
+        }
     }
 
-    fun startSshServer(runner: ProotRunner) {
+    fun toggleCamera(context: Context, rootfs: File, scope: CoroutineScope, enable: Boolean) {
+        cameraBridgeEnabled = enable
+        if (enable) {
+            try {
+                if (cameraBridge == null) {
+                    cameraBridge = CameraBridge(context, rootfs).apply { start(scope) }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting CameraBridge", e)
+            }
+        } else {
+            try { cameraBridge?.stop() } catch (_: Exception) {}
+            cameraBridge = null
+        }
+    }
+
+    fun toggleMic(context: Context, rootfs: File, scope: CoroutineScope, enable: Boolean) {
+        micBridgeEnabled = enable
+        if (enable) {
+            try {
+                if (micBridge == null) {
+                    micBridge = MicBridge(context, rootfs).apply { start(scope) }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting MicBridge", e)
+            }
+        } else {
+            try { micBridge?.stop() } catch (_: Exception) {}
+            micBridge = null
+        }
+    }
+
+    fun toggleAudio(scope: CoroutineScope, enable: Boolean) {
+        audioOutputEnabled = enable
+        if (enable) {
+            try {
+                if (audioBridge == null) {
+                    audioBridge = AudioBridge().apply { start(scope) }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting AudioBridge", e)
+            }
+        } else {
+            try { audioBridge?.stop() } catch (_: Exception) {}
+            audioBridge = null
+        }
+    }
+
+    fun toggleNotifications(context: Context, rootfs: File, enable: Boolean) {
+        notificationBridgeEnabled = enable
+        if (enable) {
+            try {
+                if (guestEventBridge == null) {
+                    guestEventBridge = GuestEventBridge(context, rootfs).apply { start() }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting GuestEventBridge", e)
+            }
+        } else {
+            try { guestEventBridge?.stop() } catch (_: Exception) {}
+            guestEventBridge = null
+        }
+    }
+
+    fun toggleClipboard(context: Context, rootfs: File, enable: Boolean) {
+        clipboardSyncEnabled = enable
+        if (enable) {
+            try {
+                if (clipboardBridge == null) {
+                    clipboardBridge = ClipboardBridge(context, rootfs).apply { start() }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting ClipboardBridge", e)
+            }
+        } else {
+            try { clipboardBridge?.stop() } catch (_: Exception) {}
+            clipboardBridge = null
+        }
+    }
+
+    fun togglePrinting(context: Context, rootfs: File, enable: Boolean) {
+        printingBridgeEnabled = enable
+        if (enable) {
+            try {
+                if (printBridge == null) {
+                    printBridge = PrintBridge(context, rootfs).apply { start() }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting PrintBridge", e)
+            }
+        } else {
+            try { printBridge?.stop() } catch (_: Exception) {}
+            printBridge = null
+        }
+    }
+
+    fun toggleCalendar(context: Context, rootfs: File, enable: Boolean) {
+        calendarSyncEnabled = enable
+        if (enable) {
+            try {
+                if (calendarBridge == null) {
+                    calendarBridge = CalendarBridge(context, rootfs).apply { sync() }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error syncing CalendarBridge", e)
+            }
+        } else {
+            calendarBridge = null
+        }
+    }
+
+    fun startSshServer(runner: ProotRunner, scope: CoroutineScope) {
         sshServerEnabled = true
-        runner.start(
-            command = listOf(
-                "/bin/sh", "-c",
-                "service dropbear start 2>/dev/null || /usr/sbin/dropbear -p 2222 2>/dev/null || service ssh start"
+        scope.launch {
+            runner.executeOneShot(
+                command = listOf(
+                    "/bin/sh", "-c",
+                    "service dropbear start 2>/dev/null || /usr/sbin/dropbear -p 2222 2>/dev/null || service ssh start"
+                ),
+                asRoot = true
             )
-        )
+        }
     }
 
-    fun stopSshServer(runner: ProotRunner) {
+    fun stopSshServer(runner: ProotRunner, scope: CoroutineScope) {
         sshServerEnabled = false
-        runner.start(
-            command = listOf("/bin/sh", "-c", "killall dropbear 2>/dev/null || killall sshd 2>/dev/null")
-        )
-    }
-
-    fun startVncServer(runner: ProotRunner) {
-        vncServerEnabled = true
-        runner.start(
-            command = listOf(
-                "/bin/sh", "-c",
-                "x11vnc -display :0 -rfbport 5900 -shared -forever -bg 2>/dev/null || tightvncserver :1"
+        scope.launch {
+            runner.executeOneShot(
+                command = listOf("/bin/sh", "-c", "killall dropbear 2>/dev/null || killall sshd 2>/dev/null"),
+                asRoot = true
             )
-        )
+        }
     }
 
-    fun stopVncServer(runner: ProotRunner) {
+    fun startVncServer(runner: ProotRunner, scope: CoroutineScope) {
+        vncServerEnabled = true
+        scope.launch {
+            runner.executeOneShot(
+                command = listOf(
+                    "/bin/sh", "-c",
+                    "x11vnc -display :0 -rfbport 5900 -shared -forever -bg 2>/dev/null || tightvncserver :1"
+                ),
+                asRoot = true
+            )
+        }
+    }
+
+    fun stopVncServer(runner: ProotRunner, scope: CoroutineScope) {
         vncServerEnabled = false
-        runner.start(
-            command = listOf("/bin/sh", "-c", "killall x11vnc 2>/dev/null || killall Xvnc 2>/dev/null")
-        )
+        scope.launch {
+            runner.executeOneShot(
+                command = listOf("/bin/sh", "-c", "killall x11vnc 2>/dev/null || killall Xvnc 2>/dev/null"),
+                asRoot = true
+            )
+        }
     }
 
-    fun repairPackages(runner: ProotRunner, onProgress: (String) -> Unit) {
-        runner.start(
-            command = listOf(
-                "/bin/sh", "-c",
-                "export DEBIAN_FRONTEND=noninteractive; dpkg --configure -a 2>&1; apt-get -f install -y 2>&1; apt-get clean 2>&1; echo 'Repair complete.'"
-            ),
-            asRoot = true,
-            onOutput = onProgress
-        )
+    fun repairPackages(runner: ProotRunner, scope: CoroutineScope, onProgress: (String) -> Unit) {
+        scope.launch {
+            runner.executeOneShot(
+                command = listOf(
+                    "/bin/sh", "-c",
+                    "export DEBIAN_FRONTEND=noninteractive; dpkg --configure -a 2>&1; apt-get -f install -y 2>&1; apt-get clean 2>&1; echo 'Repair complete.'"
+                ),
+                asRoot = true,
+                onOutput = onProgress
+            )
+        }
     }
 
     fun forceStopSession(runner: ProotRunner, onOutput: (String) -> Unit) {
-        runner.start(
-            command = listOf("/bin/sh", "-c", "kill -9 -1 2>/dev/null; echo 'Session stopped.'"),
-            asRoot = true,
-            onOutput = onOutput
-        )
+        runner.kill()
+        try {
+            Runtime.getRuntime().exec(
+                arrayOf(
+                    "sh",
+                    "-c",
+                    "pkill -9 -f libproot.so 2>/dev/null; pkill -9 -f xfce4 2>/dev/null; pkill -9 -f xfwm4 2>/dev/null; pkill -9 -f xfdesktop 2>/dev/null; pkill -9 -f openbox 2>/dev/null; rm -f /tmp/runtime-*/bus /tmp/.X*-lock /tmp/.X11-unix/X* 2>/dev/null || true"
+                )
+            ).waitFor()
+        } catch (_: Exception) {}
+        onOutput("All sessions forcefully stopped and lock files cleared.")
     }
 
     // Active bridge instances

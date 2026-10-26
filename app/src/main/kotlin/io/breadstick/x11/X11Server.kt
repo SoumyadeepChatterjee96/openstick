@@ -58,7 +58,9 @@ class X11Server(
                 File(env.tmpDir, ".X$display-lock").delete()
 
                 Os.setenv("TMPDIR", env.tmpDir.absolutePath, true)
-                Os.setenv("BREADSTICK_ROOTLESS", "0", true)
+                try {
+                    Os.unsetenv("BREADSTICK_ROOTLESS")
+                } catch (_: Exception) {}
 
                 // Resolve XKB configuration root from Debian guest or bundled assets
                 env.extractXkb()

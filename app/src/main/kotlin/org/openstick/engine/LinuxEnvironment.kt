@@ -144,7 +144,16 @@ class LinuxEnvironment(val context: Context) {
             xfwm4Wrapper.writeText("#!/bin/sh\nexec /usr/bin/xfwm4 --compositor=off \"\$@\"\n")
             xfwm4Wrapper.setExecutable(true, false)
             File(rootfsDir, "usr/lib/breadstick").mkdirs()
-            copyAsset("desktop/start-desktop-x11.sh", File(rootfsDir, "usr/lib/breadstick/start-desktop-x11.sh"))
+            val bslScript = File(rootfsDir, "usr/lib/breadstick/start-desktop-x11.sh")
+            copyAsset("desktop/start-desktop-x11.sh", bslScript)
+            bslScript.setExecutable(true, false)
+            File(rootfsDir, "usr/local/bin/start-desktop-x11").setExecutable(true, false)
+
+            // Neutralize 90gpg-agent so XFCE4 session never hangs on PRoot Unix sockets
+            val gpgAgentScript = File(rootfsDir, "etc/X11/Xsession.d/90gpg-agent")
+            if (gpgAgentScript.exists()) {
+                try { gpgAgentScript.writeText("exit 0\n") } catch (_: Exception) {}
+            }
         } catch (_: Exception) {}
     }
 

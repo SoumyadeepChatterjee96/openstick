@@ -1,6 +1,10 @@
 package org.openstick.settings
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,6 +25,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -46,28 +51,94 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val prefs = remember { context.getSharedPreferences("openstick_prefs", Context.MODE_PRIVATE) }
 
     // State
     var serviceActive by remember { mutableStateOf(false) }
-    var selectedDns by remember { mutableStateOf("Cloudflare") }
-    var customDnsIp by remember { mutableStateOf("") }
+    var selectedDns by remember { mutableStateOf(prefs.getString("selected_dns", "Cloudflare") ?: "Cloudflare") }
+    var customDnsIp by remember { mutableStateOf(prefs.getString("custom_dns_ip", "") ?: "") }
     var actionMessage by remember { mutableStateOf("") }
     var isWorking by remember { mutableStateOf(false) }
     var workFraction by remember { mutableFloatStateOf(0f) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
-    // Bridges State
-    var cameraEnabled by remember { mutableStateOf(HardwareBridges.cameraBridgeEnabled) }
-    var micEnabled by remember { mutableStateOf(HardwareBridges.micBridgeEnabled) }
-    var audioOutputEnabled by remember { mutableStateOf(HardwareBridges.audioOutputEnabled) }
-    var notifEnabled by remember { mutableStateOf(HardwareBridges.notificationBridgeEnabled) }
-    var calendarEnabled by remember { mutableStateOf(HardwareBridges.calendarSyncEnabled) }
-    var clipboardEnabled by remember { mutableStateOf(HardwareBridges.clipboardSyncEnabled) }
-    var printingEnabled by remember { mutableStateOf(HardwareBridges.printingBridgeEnabled) }
+    // Bridges State - initialized from preferences (default: false)
+    var cameraEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_camera", false)) }
+    var micEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_mic", false)) }
+    var audioOutputEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_audio", false)) }
+    var notifEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_notif", false)) }
+    var calendarEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_calendar", false)) }
+    var clipboardEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_clipboard", false)) }
+    var printingEnabled by remember { mutableStateOf(prefs.getBoolean("bridge_printing", false)) }
     var sshEnabled by remember { mutableStateOf(HardwareBridges.sshServerEnabled) }
     var vncEnabled by remember { mutableStateOf(HardwareBridges.vncServerEnabled) }
     var gpuEnabled by remember { mutableStateOf(GpuServer.isRunning) }
     var processBudget by remember { mutableFloatStateOf(HardwareBridges.processLimit.toFloat()) }
+
+    // Permission Launchers for runtime consent
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            cameraEnabled = true
+            HardwareBridges.toggleCamera(context, env.rootfsDir, scope, true)
+            prefs.edit().putBoolean("bridge_camera", true).apply()
+            actionMessage = "Camera permission granted • Bridge active"
+        } else {
+            cameraEnabled = false
+            HardwareBridges.toggleCamera(context, env.rootfsDir, scope, false)
+            prefs.edit().putBoolean("bridge_camera", false).apply()
+            actionMessage = "Camera permission denied"
+        }
+    }
+
+    val micLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            micEnabled = true
+            HardwareBridges.toggleMic(context, env.rootfsDir, scope, true)
+            prefs.edit().putBoolean("bridge_mic", true).apply()
+            actionMessage = "Microphone permission granted • Audio input active"
+        } else {
+            micEnabled = false
+            HardwareBridges.toggleMic(context, env.rootfsDir, scope, false)
+            prefs.edit().putBoolean("bridge_mic", false).apply()
+            actionMessage = "Microphone permission denied"
+        }
+    }
+
+    val calendarLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            calendarEnabled = true
+            HardwareBridges.toggleCalendar(context, env.rootfsDir, true)
+            prefs.edit().putBoolean("bridge_calendar", true).apply()
+            actionMessage = "Calendar permission granted • Sync active"
+        } else {
+            calendarEnabled = false
+            HardwareBridges.toggleCalendar(context, env.rootfsDir, false)
+            prefs.edit().putBoolean("bridge_calendar", false).apply()
+            actionMessage = "Calendar permission denied"
+        }
+    }
+
+    val notifLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            notifEnabled = true
+            HardwareBridges.toggleNotifications(context, env.rootfsDir, true)
+            prefs.edit().putBoolean("bridge_notif", true).apply()
+            actionMessage = "Notification permission granted • Alerts active"
+        } else {
+            notifEnabled = false
+            HardwareBridges.toggleNotifications(context, env.rootfsDir, false)
+            prefs.edit().putBoolean("bridge_notif", false).apply()
+            actionMessage = "Notification permission denied"
+        }
+    }
 
     // Snapshot restore picker
     val restoreLauncher = rememberLauncherForActivityResult(
@@ -178,63 +249,132 @@ fun SettingsScreen(
                 title = "Camera Bridge",
                 subtitle = "Expose Android camera feed to guest Linux (/run/bsl/camera)",
                 checked = cameraEnabled,
-                onCheckedChange = {
-                    cameraEnabled = it
-                    HardwareBridges.cameraBridgeEnabled = it
+                onCheckedChange = { enable ->
+                    if (enable) {
+                        val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                        if (hasPerm) {
+                            cameraEnabled = true
+                            HardwareBridges.toggleCamera(context, env.rootfsDir, scope, true)
+                            prefs.edit().putBoolean("bridge_camera", true).apply()
+                            actionMessage = "Camera bridge active"
+                        } else {
+                            cameraLauncher.launch(Manifest.permission.CAMERA)
+                        }
+                    } else {
+                        cameraEnabled = false
+                        HardwareBridges.toggleCamera(context, env.rootfsDir, scope, false)
+                        prefs.edit().putBoolean("bridge_camera", false).apply()
+                        actionMessage = "Camera bridge stopped"
+                    }
                 }
             )
             SwitchRow(
                 title = "Microphone Bridge",
                 subtitle = "Route Android audio input into PulseAudio record stream",
                 checked = micEnabled,
-                onCheckedChange = {
-                    micEnabled = it
-                    HardwareBridges.micBridgeEnabled = it
+                onCheckedChange = { enable ->
+                    if (enable) {
+                        val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                        if (hasPerm) {
+                            micEnabled = true
+                            HardwareBridges.toggleMic(context, env.rootfsDir, scope, true)
+                            prefs.edit().putBoolean("bridge_mic", true).apply()
+                            actionMessage = "Microphone audio bridge active"
+                        } else {
+                            micLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    } else {
+                        micEnabled = false
+                        HardwareBridges.toggleMic(context, env.rootfsDir, scope, false)
+                        prefs.edit().putBoolean("bridge_mic", false).apply()
+                        actionMessage = "Microphone bridge stopped"
+                    }
                 }
             )
             SwitchRow(
                 title = "PulseAudio Sound Output",
                 subtitle = "TCP pulse server listening on 127.0.0.1:4713",
                 checked = audioOutputEnabled,
-                onCheckedChange = {
-                    audioOutputEnabled = it
-                    HardwareBridges.audioOutputEnabled = it
+                onCheckedChange = { enable ->
+                    audioOutputEnabled = enable
+                    HardwareBridges.toggleAudio(scope, enable)
+                    prefs.edit().putBoolean("bridge_audio", enable).apply()
+                    actionMessage = if (enable) "PulseAudio playback bridge active" else "Sound output disabled"
                 }
             )
             SwitchRow(
                 title = "Bi-directional Notifications",
                 subtitle = "Forward Linux notify-send alerts to Android notification tray",
                 checked = notifEnabled,
-                onCheckedChange = {
-                    notifEnabled = it
-                    HardwareBridges.notificationBridgeEnabled = it
+                onCheckedChange = { enable ->
+                    if (enable) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                            if (hasPerm) {
+                                notifEnabled = true
+                                HardwareBridges.toggleNotifications(context, env.rootfsDir, true)
+                                prefs.edit().putBoolean("bridge_notif", true).apply()
+                                actionMessage = "Notification sync active"
+                            } else {
+                                notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        } else {
+                            notifEnabled = true
+                            HardwareBridges.toggleNotifications(context, env.rootfsDir, true)
+                            prefs.edit().putBoolean("bridge_notif", true).apply()
+                            actionMessage = "Notification sync active"
+                        }
+                    } else {
+                        notifEnabled = false
+                        HardwareBridges.toggleNotifications(context, env.rootfsDir, false)
+                        prefs.edit().putBoolean("bridge_notif", false).apply()
+                        actionMessage = "Notification sync stopped"
+                    }
                 }
             )
             SwitchRow(
                 title = "Calendar Sync",
                 subtitle = "Bridge Android device calendar events to /run/bsl/calendar",
                 checked = calendarEnabled,
-                onCheckedChange = {
-                    calendarEnabled = it
-                    HardwareBridges.calendarSyncEnabled = it
+                onCheckedChange = { enable ->
+                    if (enable) {
+                        val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
+                        if (hasPerm) {
+                            calendarEnabled = true
+                            HardwareBridges.toggleCalendar(context, env.rootfsDir, true)
+                            prefs.edit().putBoolean("bridge_calendar", true).apply()
+                            actionMessage = "Calendar sync active"
+                        } else {
+                            calendarLauncher.launch(Manifest.permission.READ_CALENDAR)
+                        }
+                    } else {
+                        calendarEnabled = false
+                        HardwareBridges.toggleCalendar(context, env.rootfsDir, false)
+                        prefs.edit().putBoolean("bridge_calendar", false).apply()
+                        actionMessage = "Calendar sync stopped"
+                    }
                 }
             )
             SwitchRow(
                 title = "Clipboard Sync",
                 subtitle = "Seamless clipboard sharing between Android and X11/Linux",
                 checked = clipboardEnabled,
-                onCheckedChange = {
-                    clipboardEnabled = it
-                    HardwareBridges.clipboardSyncEnabled = it
+                onCheckedChange = { enable ->
+                    clipboardEnabled = enable
+                    HardwareBridges.toggleClipboard(context, env.rootfsDir, enable)
+                    prefs.edit().putBoolean("bridge_clipboard", enable).apply()
+                    actionMessage = if (enable) "Clipboard synchronization active" else "Clipboard sync disabled"
                 }
             )
             SwitchRow(
                 title = "Printing Bridge",
                 subtitle = "CUPS / PDF direct printer backend service (/run/bsl/printing)",
                 checked = printingEnabled,
-                onCheckedChange = {
-                    printingEnabled = it
-                    HardwareBridges.printingBridgeEnabled = it
+                onCheckedChange = { enable ->
+                    printingEnabled = enable
+                    HardwareBridges.togglePrinting(context, env.rootfsDir, enable)
+                    prefs.edit().putBoolean("bridge_printing", enable).apply()
+                    actionMessage = if (enable) "Printing spooler active" else "Printing bridge stopped"
                 }
             )
 
@@ -242,11 +382,13 @@ fun SettingsScreen(
 
             OutlinedButton(
                 onClick = {
-                    runner.start(
-                        command = listOf("/bin/sh", "-c", "pulseaudio -k 2>/dev/null; pulseaudio --start --exit-idle-time=-1 2>/dev/null || true"),
-                        onOutput = { actionMessage = it }
-                    )
-                    actionMessage = "PulseAudio sound server restarted"
+                    scope.launch {
+                        runner.executeOneShot(
+                            command = listOf("/bin/sh", "-c", "pulseaudio -k 2>/dev/null; pulseaudio --start --exit-idle-time=-1 2>/dev/null || true"),
+                            onOutput = { actionMessage = it }
+                        )
+                        actionMessage = "PulseAudio sound server restarted"
+                    }
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -269,8 +411,9 @@ fun SettingsScreen(
                         selected = selectedDns == dns,
                         onClick = {
                             selectedDns = dns
+                            prefs.edit().putString("selected_dns", dns).apply()
                             HardwareBridges.applyDnsConfig(env, dns, customDnsIp)
-                            actionMessage = "Applied $dns DNS to /etc/resolv.conf"
+                            actionMessage = "Applied $dns DNS to Linux environment"
                         },
                         label = { Text(dns, fontSize = 11.sp) }
                     )
@@ -283,6 +426,7 @@ fun SettingsScreen(
                     value = customDnsIp,
                     onValueChange = {
                         customDnsIp = it
+                        prefs.edit().putString("custom_dns_ip", it).apply()
                         HardwareBridges.applyDnsConfig(env, "Custom", it)
                     },
                     label = { Text("Custom DNS IP (e.g., 9.9.9.9)") },
@@ -300,10 +444,10 @@ fun SettingsScreen(
                 onCheckedChange = {
                     sshEnabled = it
                     if (it) {
-                        HardwareBridges.startSshServer(runner)
+                        HardwareBridges.startSshServer(runner, scope)
                         actionMessage = "SSH Server started on port 2222"
                     } else {
-                        HardwareBridges.stopSshServer(runner)
+                        HardwareBridges.stopSshServer(runner, scope)
                         actionMessage = "SSH Server stopped"
                     }
                 }
@@ -316,10 +460,10 @@ fun SettingsScreen(
                 onCheckedChange = {
                     vncEnabled = it
                     if (it) {
-                        HardwareBridges.startVncServer(runner)
+                        HardwareBridges.startVncServer(runner, scope)
                         actionMessage = "VNC Server listening on localhost:5900"
                     } else {
-                        HardwareBridges.stopVncServer(runner)
+                        HardwareBridges.stopVncServer(runner, scope)
                         actionMessage = "VNC Server stopped"
                     }
                 }
@@ -387,7 +531,7 @@ fun SettingsScreen(
             OutlinedButton(
                 onClick = {
                     actionMessage = "Repairing packages with dpkg & apt-get -f install..."
-                    HardwareBridges.repairPackages(runner) { log ->
+                    HardwareBridges.repairPackages(runner, scope) { log ->
                         actionMessage = log
                     }
                 },

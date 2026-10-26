@@ -1,4 +1,9 @@
 #!/bin/sh
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Neutralize 90gpg-agent so XFCE4 startup does not hang indefinitely on Unix domain sockets under PRoot
+if [ -f /etc/X11/Xsession.d/90gpg-agent ]; then
+    echo "exit 0" > /etc/X11/Xsession.d/90gpg-agent 2>/dev/null || true
+fi
 # Launch a lightweight window manager (openbox) plus apps on the embedded X server.
 # NO desktop environment, NO systemd, NO logind — apps are the unit (ChromeOS-style).
 # The app already started the X server + created /tmp/.X11-unix/XN. Args: DISPLAY_NUM USER.

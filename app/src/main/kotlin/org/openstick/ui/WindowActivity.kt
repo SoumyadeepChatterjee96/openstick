@@ -137,10 +137,11 @@ fun WindowContent(
             x11Server.start { success ->
                 if (success) {
                     statusText = "Display ready"
+                    val user = env.getConfiguredUsername()
                     val launchCmd = if (mode == WindowActivity.MODE_APP && !cmd.isNullOrBlank()) {
-                        "export DISPLAY=:0; export PULSE_SERVER=tcp:127.0.0.1:4713; $cmd"
+                        "export DISPLAY=:0; $cmd"
                     } else {
-                        env.startDesktopCommand(0, "root")
+                        env.startDesktopCommand(0, user)
                     }
                     scope.launch(Dispatchers.IO) {
                         try {

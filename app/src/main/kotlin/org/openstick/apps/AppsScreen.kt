@@ -45,6 +45,7 @@ fun AppsScreen(
     var selectedCategory by remember { mutableStateOf("All") }
     var searchQuery by remember { mutableStateOf("") }
     var isInstalling by remember { mutableStateOf(false) }
+    var isRunningInstall by remember { mutableStateOf(false) }
     var activeAppName by remember { mutableStateOf("") }
     var installLog by remember { mutableStateOf("") }
 
@@ -55,6 +56,7 @@ fun AppsScreen(
         uri?.let {
             scope.launch {
                 isInstalling = true
+                isRunningInstall = true
                 activeAppName = "Local Package"
                 installLog = "Copying package from device storage...\n"
 
@@ -72,13 +74,19 @@ fun AppsScreen(
                         "-c",
                         "export DEBIAN_FRONTEND=noninteractive && dpkg -i /tmp/local_package.deb || apt-get -f install -y"
                     )
-                    runner.start(
+                    val exitCode = runner.executeOneShot(
                         command = cmd,
                         asRoot = true,
                         onOutput = { line -> installLog += "$line\n" }
                     )
-                    installLog += "\nPackage installed successfully!"
+                    isRunningInstall = false
+                    if (exitCode == 0) {
+                        installLog += "\n✓ Package installed successfully!"
+                    } else {
+                        installLog += "\n✗ Package installation finished with code $exitCode."
+                    }
                 } catch (e: Exception) {
+                    isRunningInstall = false
                     installLog += "\nError: ${e.message}"
                 }
             }
@@ -188,6 +196,7 @@ fun AppsScreen(
                     onInstall = {
                         scope.launch {
                             isInstalling = true
+                            isRunningInstall = true
                             activeAppName = app.name
                             installLog = "Starting APT installation for ${app.name}...\n"
                             val cmd = listOf(
@@ -195,12 +204,17 @@ fun AppsScreen(
                                 "-c",
                                 "export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y --no-install-recommends ${app.aptPackage}"
                             )
-                            runner.start(
+                            val exitCode = runner.executeOneShot(
                                 command = cmd,
                                 asRoot = true,
                                 onOutput = { line -> installLog += "$line\n" }
                             )
-                            installLog += "\nDone! ${app.name} is installed."
+                            isRunningInstall = false
+                            if (exitCode == 0) {
+                                installLog += "\n✓ Installation complete! ${app.name} is installed."
+                            } else {
+                                installLog += "\n✗ Installation failed with code $exitCode."
+                            }
                         }
                     },
                     onLaunch = {
@@ -221,23 +235,31 @@ fun AppsScreen(
     // Installation Live Modal
     if (isInstalling) {
         AlertDialog(
-            onDismissRequest = { isInstalling = false },
+            onDismissRequest = { if (!isRunningInstall) isInstalling = false },
             confirmButton = {
-                TextButton(onClick = { isInstalling = false }) {
-                    Text("Close")
+                TextButton(
+                    onClick = { isInstalling = false },
+                    enabled = !isRunningInstall
+                ) {
+                    Text(if (isRunningInstall) "Installing..." else "Close")
                 }
             },
             title = {
-                Text("Installing $activeAppName", fontWeight = FontWeight.Bold)
+                Text(
+                    text = if (isRunningInstall) "Installing $activeAppName" else "$activeAppName Installation Complete",
+                    fontWeight = FontWeight.Bold
+                )
             },
             text = {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    LinearProgressIndicator(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    if (isRunningInstall) {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()

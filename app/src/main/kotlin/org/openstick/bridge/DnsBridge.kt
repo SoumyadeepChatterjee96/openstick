@@ -65,6 +65,25 @@ class DnsBridge(
         applyDnsFromProperties(lp)
     }
 
+    fun applyCustomDns(servers: List<String>) {
+        val validServers = servers.filter { it.isNotBlank() }
+        val targetList = if (validServers.isNotEmpty()) validServers else FALLBACK_DNS
+
+        val content = buildString {
+            append("# Generated dynamically by OpenStick DnsBridge\n")
+            targetList.distinct().forEach { ip ->
+                append("nameserver ").append(ip.trim()).append("\n")
+            }
+        }
+
+        try {
+            resolvConf.parentFile?.mkdirs()
+            resolvConf.writeText(content)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to write resolv.conf", e)
+        }
+    }
+
     private fun applyDnsFromProperties(lp: LinkProperties?) {
         val servers = mutableListOf<String>()
         lp?.dnsServers?.forEach { addr ->

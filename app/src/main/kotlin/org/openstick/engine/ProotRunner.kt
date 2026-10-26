@@ -24,6 +24,50 @@ class ProotRunner(
     private val _output = MutableStateFlow("")
     val output: StateFlow<String> = _output.asStateFlow()
 
+    /**
+     * Executes a one-off command in an independent PRoot process without blocking or being
+     * blocked by the main session runner.
+     */
+    suspend fun executeOneShot(
+        command: List<String>,
+        workdir: String? = null,
+        asRoot: Boolean = false,
+        onOutput: ((String) -> Unit)? = null
+    ): Int = withContext(Dispatchers.IO) {
+        env.ensureDirectories()
+        val configuredUser = env.getConfiguredUsername()
+        val effectiveWorkdir = workdir ?: if (asRoot) "/root" else "/home/$configuredUser"
+        val fullCmd = env.buildProotCommand(effectiveWorkdir, asRoot, command)
+        val envVars = env.getEnvironmentVariables(asRoot)
+
+        try {
+            val pb = ProcessBuilder(fullCmd)
+            pb.directory(env.rootfsDir)
+            pb.environment().putAll(env.prootEnv())
+            pb.environment().putAll(envVars)
+            pb.redirectErrorStream(true)
+
+            val proc = pb.start()
+            val buffer = ByteArray(4096)
+            val stream: InputStream = proc.inputStream
+            while (true) {
+                val read = stream.read(buffer)
+                if (read < 0) break
+                val text = String(buffer, 0, read)
+                withContext(Dispatchers.Main) {
+                    onOutput?.invoke(text)
+                }
+            }
+            proc.waitFor()
+        } catch (e: Throwable) {
+            val err = "One-shot command error: ${e.message}\n"
+            withContext(Dispatchers.Main) {
+                onOutput?.invoke(err)
+            }
+            -1
+        }
+    }
+
     fun start(
         command: List<String>? = null,
         workdir: String? = null,
@@ -110,16 +154,32 @@ class ProotRunner(
 
     fun kill() {
         scope.launch(Dispatchers.IO) {
-            try {
-                process?.destroyForcibly()
-            } catch (_: Exception) {}
-            try {
-                // Kill any orphaned proot processes
-                Runtime.getRuntime().exec(arrayOf("sh", "-c", "killall -9 proot 2>/dev/null || true")).waitFor()
-            } catch (_: Exception) {}
-            _isRunning.value = false
-            process = null
-            stdin = null
+            killInternal()
         }
+    }
+
+    suspend fun killSync() {
+        withContext(Dispatchers.IO) {
+            killInternal()
+        }
+    }
+
+    private fun killInternal() {
+        try {
+            process?.destroyForcibly()
+        } catch (_: Exception) {}
+        try {
+            // Kill any orphaned proot processes and desktop managers on host side
+            Runtime.getRuntime().exec(
+                arrayOf(
+                    "sh",
+                    "-c",
+                    "pkill -9 -f libproot.so 2>/dev/null; pkill -9 -f xfce4 2>/dev/null; pkill -9 -f xfwm4 2>/dev/null; pkill -9 -f xfdesktop 2>/dev/null; pkill -9 -f openbox 2>/dev/null || true"
+                )
+            ).waitFor()
+        } catch (_: Exception) {}
+        _isRunning.value = false
+        process = null
+        stdin = null
     }
 }
