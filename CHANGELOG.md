@@ -57,7 +57,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [1.2.0] - 2026-10-26
 
 ### Changed
-- **Complete OpenStick Rebranding**: Removed all legacy references across package names, startup scripts (`start-desktop-x11.sh`), assets, documentation, and environment variables (`OPENSTICK_DPI`, `OPENSTICK_MOTD_SHOWN`).
+- **OpenStick Environment & Configuration Standardization**: Consolidated and standardized all environment variables (`OPENSTICK_DPI`, `OPENSTICK_MOTD_SHOWN`), internal package paths, and startup scripts (`start-desktop-x11.sh`).
 
 ### Fixed
 - **Terminal Resize / stty Exit 69 Pollution**: Eliminated `stty: 'standard input': unable to perform all requested operations` errors printed when the terminal PTY resized during shell initialization.
@@ -83,7 +83,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 - **Bidirectional Hardware Bridges**:
   - PulseAudio TCP audio server on `127.0.0.1:4713`.
-  - Hardware camera video feed piped directly to `/run/bsl/camera`.
+  - Hardware camera video feed piped directly to guest video bridge (`/run/camera`).
   - Android notification bridge forwarding `notify-send` desktop alerts to the Android system notification shade.
   - Android calendar synchronization and CUPS/PDF printing bridge.
 - **Desktop Touch Gestures & Navigation**:
