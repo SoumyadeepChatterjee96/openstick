@@ -175,6 +175,26 @@ class LinuxEnvironment(val context: Context) {
             if (gpgAgentScript.exists()) {
                 try { gpgAgentScript.writeText("exit 0\n") } catch (_: Exception) {}
             }
+
+            // ── PRoot sudo shim ────────────────────────────────────────────
+            // Real sudo cannot work under PRoot (no kernel SUID, no real UID 0).
+            // We ship a shell wrapper + a tiny LD_PRELOAD library that fakes
+            // root identity and silences chown() calls so apt/dpkg/tar work.
+            File(rootfsDir, "usr/lib/openstick").mkdirs()
+            copyAsset("desktop/libsudo.so", File(rootfsDir, "usr/lib/openstick/libsudo.so"))
+            copyAsset("desktop/sudo-shim", File(rootfsDir, "usr/local/bin/sudo"))
+            File(rootfsDir, "usr/local/bin/sudo").setExecutable(true, false)
+
+            // APT sandbox configuration: under PRoot, apt's _apt user privilege
+            // drop fails; tell it to run as root instead.
+            val aptSandboxConf = File(rootfsDir, "etc/apt/apt.conf.d/00sandbox")
+            if (!aptSandboxConf.exists()) {
+                try { aptSandboxConf.writeText("APT::Sandbox::User \"root\";\n") } catch (_: Exception) {}
+            }
+
+            // Fix /etc/profile: use full path for `id` (it may not be in PATH
+            // when su starts a login shell) and give ALL users sbin paths.
+            copyAsset("desktop/etc-profile", File(rootfsDir, "etc/profile"))
         } catch (_: Exception) {}
     }
 

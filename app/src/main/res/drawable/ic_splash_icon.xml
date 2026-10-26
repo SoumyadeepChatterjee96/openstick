@@ -2,116 +2,27 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="160dp"
     android:height="160dp"
-    android:viewportWidth="160"
-    android:viewportHeight="160">
+    android:viewportWidth="108"
+    android:viewportHeight="108">
 
-    <!-- Scaled & Centered (scale = 160/108 = ~1.4815, offset to center 80, 80) -->
-    <group
-        android:scaleX="1.35"
-        android:scaleY="1.35"
-        android:pivotX="80"
-        android:pivotY="80"
-        android:translateX="26"
-        android:translateY="26">
+    <!-- Outer 'O' Monogram Ring -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:pathData="M54,28 A26,26 0 1,0 54,80 A26,26 0 1,0 54,28 Z"/>
 
-        <!-- 1. Ambient Glow Aura -->
-        <path
-            android:strokeColor="#00F0FF"
-            android:strokeWidth="8"
-            android:strokeAlpha="0.15"
-            android:strokeLineCap="round"
-            android:pathData="M54,23 A31,31 0 1,0 54,85 A31,31 0 1,0 54,23 Z"/>
+    <!-- Inset Terminal Chevron > -->
+    <path
+        android:strokeColor="#00E5FF"
+        android:strokeWidth="3.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M46.5,46.5 L54.5,54 L46.5,61.5"/>
 
-        <!-- 2. Cyber 'O' Ring (Aperture) -->
-        <path
-            android:strokeColor="#00F0FF"
-            android:strokeWidth="3.6"
-            android:strokeLineCap="round"
-            android:pathData="M73,34 A30,30 0 1,0 54,84 A30,30 0 0,0 79,43"/>
-
-        <path
-            android:strokeColor="#7C4DFF"
-            android:strokeWidth="3.6"
-            android:strokeLineCap="round"
-            android:pathData="M54,84 A30,30 0 0,0 84,54"/>
-
-        <!-- Nodes at gap -->
-        <path
-            android:fillColor="#00F0FF"
-            android:pathData="M73,34 A1.8,1.8 0 1,0 76.6,34 A1.8,1.8 0 1,0 73,34 Z"/>
-        <path
-            android:fillColor="#7C4DFF"
-            android:pathData="M79,43 A1.8,1.8 0 1,0 82.6,43 A1.8,1.8 0 1,0 79,43 Z"/>
-
-        <!-- 3. Silicon Stick Body -->
-        <path
-            android:fillColor="#151D2E"
-            android:strokeColor="#2E3C56"
-            android:strokeWidth="0.8"
-            android:pathData="M46,20 L62,20 L62,28 L46,28 Z"/>
-
-        <!-- Gold Pins -->
-        <path
-            android:fillColor="#FFD54F"
-            android:pathData="M48,21 L50,21 L50,26 L48,26 Z"/>
-        <path
-            android:fillColor="#FFD54F"
-            android:pathData="M51.5,21 L53.5,21 L53.5,26 L51.5,26 Z"/>
-        <path
-            android:fillColor="#FFD54F"
-            android:pathData="M54.5,21 L56.5,21 L56.5,26 L54.5,26 Z"/>
-        <path
-            android:fillColor="#FFD54F"
-            android:pathData="M58,21 L60,21 L60,26 L58,26 Z"/>
-
-        <path
-            android:fillColor="#0F172A"
-            android:strokeColor="#00F0FF"
-            android:strokeWidth="1.4"
-            android:pathData="M44,28 C42.5,28 41,29.5 41,31 L41,75 C41,76.5 42.5,78 44,78 L64,78 C65.5,78 67,76.5 67,75 L67,31 C67,29.5 65.5,28 64,28 Z"/>
-
-        <path
-            android:strokeColor="#00F0FF"
-            android:strokeWidth="1.4"
-            android:strokeLineCap="round"
-            android:pathData="M51,78 C51,82 57,82 57,78"/>
-
-        <!-- Terminal Screen -->
-        <path
-            android:fillColor="#030712"
-            android:strokeColor="#1E293B"
-            android:strokeWidth="0.8"
-            android:pathData="M43.5,33 C42.7,33 42,33.7 42,34.5 L42,71.5 C42,72.3 42.7,73 43.5,73 L64.5,73 C65.3,73 66,72.3 66,71.5 L66,34.5 C66,33.7 65.3,33 64.5,33 Z"/>
-
-        <!-- Status LEDs -->
-        <path
-            android:fillColor="#00E676"
-            android:pathData="M45,36 A1.2,1.2 0 1,0 47.4,36 A1.2,1.2 0 1,0 45,36 Z"/>
-        <path
-            android:fillColor="#00F0FF"
-            android:pathData="M48.5,36 A0.9,0.9 0 1,0 50.3,36 A0.9,0.9 0 1,0 48.5,36 Z"/>
-
-        <!-- Command Prompt: '>' and '_' -->
-        <path
-            android:strokeColor="#FFFFFF"
-            android:strokeWidth="2.8"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round"
-            android:pathData="M47,48 L53,53 L47,58"/>
-        <path
-            android:strokeColor="#00E676"
-            android:strokeWidth="2.8"
-            android:strokeLineCap="round"
-            android:pathData="M56,58 L62,58"/>
-
-        <!-- Kernel Matrix Indicator -->
-        <path
-            android:fillColor="#00E676"
-            android:fillAlpha="0.85"
-            android:pathData="M48,65 L58,65 L58,66.4 L48,66.4 Z"/>
-        <path
-            android:fillColor="#7C4DFF"
-            android:fillAlpha="0.85"
-            android:pathData="M50,68 L56,68 L56,69.4 L50,69.4 Z"/>
-    </group>
+    <!-- Inset Terminal Cursor _ -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.8"
+        android:strokeLineCap="round"
+        android:pathData="M57.5,61.5 L65.5,61.5"/>
 </vector>

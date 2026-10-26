@@ -1,0 +1,46 @@
+#!/bin/sh
+# OpenStick Linux — sudo shim for PRoot environments
+#
+# Real sudo cannot work under PRoot (no kernel SUID, no real UID 0).
+# This wrapper fakes root identity via LD_PRELOAD and runs the command
+# directly, which is safe: the entire PRoot container is already an
+# unprivileged sandbox isolated to the app's private storage.
+
+# ── parse and discard standard sudo flags ────────────────────────────
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        # Options that take an argument
+        -u|-g|-C|-D|-R|-T|-p|-r|-t)  shift 2 ;;
+        -u=*|-g=*|-C=*|-D=*|-R=*)   shift ;;
+        # Boolean flags
+        -A|-b|-E|-H|-K|-k|-n|-P|-S|-s|-V|-v|--preserve-env|--login|--reset-timestamp|--validate|--non-interactive|--stdin|--set-home|--bell|--background|--close-from=*|--list|--remove-timestamp)
+            shift ;;
+        -i)
+            # sudo -i: run a login shell
+            shift
+            if [ "$#" -eq 0 ]; then
+                export LD_PRELOAD=/usr/lib/openstick/libsudo.so
+                export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+                exec "${SHELL:-/bin/bash}" --login
+            fi
+            ;;
+        --)
+            shift; break ;;
+        -*)
+            shift ;;
+        *)
+            break ;;
+    esac
+done
+
+if [ "$#" -eq 0 ]; then
+    # bare "sudo" with no command — give a root shell
+    export LD_PRELOAD=/usr/lib/openstick/libsudo.so
+    export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    exec "${SHELL:-/bin/bash}" --login
+fi
+
+# ── run the command with faked root identity ─────────────────────────
+export LD_PRELOAD=/usr/lib/openstick/libsudo.so
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+exec "$@"

@@ -4,30 +4,25 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Outer 'O' Ring -->
-    <path
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3.2"
-        android:strokeLineCap="round"
-        android:pathData="M73,34 A30,30 0 1,0 54,84 A30,30 0 0,0 79,43"/>
 
-    <!-- Stick Body -->
+    <!-- Outer 'O' Monogram Ring -->
     <path
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="1.2"
-        android:strokeAlpha="0.8"
-        android:pathData="M44,28 C42.5,28 41,29.5 41,31 L41,75 C41,76.5 42.5,78 44,78 L64,78 C65.5,78 67,76.5 67,75 L67,31 C67,29.5 65.5,28 64,28 Z"/>
+        android:strokeWidth="5"
+        android:pathData="M54,28 A26,26 0 1,0 54,80 A26,26 0 1,0 54,28 Z"/>
 
-    <!-- Terminal Prompt: '>' and '_' -->
+    <!-- Inset Terminal Chevron > -->
     <path
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="2.4"
+        android:strokeWidth="3.8"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M47,48 L53,53 L47,58"/>
+        android:pathData="M46.5,46.5 L54.5,54 L46.5,61.5"/>
+
+    <!-- Inset Terminal Cursor _ -->
     <path
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="2.4"
+        android:strokeWidth="3.8"
         android:strokeLineCap="round"
-        android:pathData="M56,58 L62,58"/>
+        android:pathData="M57.5,61.5 L65.5,61.5"/>
 </vector>
